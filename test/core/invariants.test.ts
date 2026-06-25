@@ -36,8 +36,10 @@ describe("invariants", () => {
     const sig = (wf: N8nWorkflow) =>
       wf.nodes.map((n) => `${n.name}:${n.type}`).sort().join("|");
     expect(sig(workflow)).toBe(sig(input));
-    // relayout must not introduce _meta if the input didn't have it
-    if (!("_meta" in input)) {
+    // _meta: relayout must not ADD it; if the input had it, it must round-trip untouched (spec §8).
+    if ("_meta" in input) {
+      expect(workflow._meta).toEqual((input as { _meta: unknown })._meta);
+    } else {
       expect("_meta" in workflow).toBe(false);
     }
   });
