@@ -1,0 +1,730 @@
+{
+  "id": "FT5WJ01mKABg7IwM",
+  "name": "AI Planning",
+  "active": true,
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Webhook: GitLab Issue",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        480
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gitlab-issue-intake",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "gitlab-issue-intake-v1"
+    },
+    {
+      "id": "n2",
+      "name": "Code: Validate & Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        480
+      ],
+      "parameters": {
+        "jsCode": "const headers = $('Webhook: GitLab Issue').item.json.headers;\nconst body    = $('Webhook: GitLab Issue').item.json.body;\n\nconst secret = headers['x-gitlab-token'] ?? '';\nif (secret !== '1aa775b82eca4db73fb36a775f652c83459dd1d1dacb317641a9b1b5f3380b34') {\n  throw new Error('Invalid webhook secret');\n}\n\nconst action         = body.object_attributes?.action ?? '';\nconst assignee       = body.assignees?.[0]?.username ?? '';\nconst issueIid       = body.object_attributes?.iid;\nconst issueProjectId = String(body.project?.id ?? '');\nconst knownDevs      = ['henry2k'];\n\nconst currentIssue  = $input.first().json;\nconst currentLabels = currentIssue.labels ?? [];\n\nconst staticData  = $getWorkflowStaticData('global');\nconst pendingJobs = staticData.pendingJobs ?? {};\n\nconst dedupeKey     = `${issueProjectId}:${issueIid}`;\nconst alreadyQueued = Object.values(pendingJobs).some(\n  j => `${j.issueProjectId}:${j.issueIid}` === dedupeKey\n);\n\nconst hasRequiredLabels = currentLabels.includes('Plan') && currentLabels.includes('Agent');\nif (!hasRequiredLabels && alreadyQueued) {\n  const keyToRemove = Object.keys(pendingJobs).find(\n    k => `${pendingJobs[k].issueProjectId}:${pendingJobs[k].issueIid}` === dedupeKey\n  );\n  if (keyToRemove) {\n    delete staticData.pendingJobs[keyToRemove];\n  }\n}\n\nconst shouldProcess =\n  !alreadyQueued &&\n  hasRequiredLabels &&\n  knownDevs.includes(assignee) &&\n  ['open', 'update', 'reopen'].includes(action);\n\nreturn [{\n  json: {\n    shouldProcess,\n    issueIid,\n    issueProjectId,\n    issueTitle: body.object_attributes?.title ?? '',\n    issueDesc:  body.object_attributes?.description ?? '',\n    assignee,\n  }\n}];"
+      }
+    },
+    {
+      "id": "n3",
+      "name": "IF: Should Process?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        920,
+        480
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.shouldProcess }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Respond: Ignore",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        680
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\":\"ignored\"}",
+        "options": {}
+      }
+    },
+    {
+      "id": "n5",
+      "name": "Code: Build Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        480
+      ],
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nreturn [{\n  json: {\n    jobId:          $execution.id,\n    issueIid:       input.issueIid,\n    issueProjectId: input.issueProjectId,\n    issueTitle:     input.issueTitle,\n    issueDesc:      input.issueDesc,\n    assignee:       input.assignee,\n    status:         'pending',\n    resumeUrl:      $execution.resumeUrl,\n    createdAt:      new Date().toISOString(),\n  }\n}];"
+      }
+    },
+    {
+      "id": "n15",
+      "name": "Code: Register Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        480
+      ],
+      "parameters": {
+        "jsCode": "\nconst job = $input.first().json;\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.pendingJobs) staticData.pendingJobs = {};\nstaticData.pendingJobs[job.jobId] = job;\nreturn $input.all();\n"
+      }
+    },
+    {
+      "id": "n6",
+      "name": "Respond: Acknowledge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1520,
+        480
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\":\"queued\"}",
+        "options": {}
+      }
+    },
+    {
+      "id": "n7",
+      "name": "Wait: Resume Webhook",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1720,
+        480
+      ],
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "POST"
+      },
+      "webhookId": "ai-planner-wait-v1"
+    },
+    {
+      "id": "n16",
+      "name": "Code: Deregister Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        480
+      ],
+      "parameters": {
+        "jsCode": "\nconst staticData = $getWorkflowStaticData('global');\nif (staticData.pendingJobs) {\n  delete staticData.pendingJobs[$execution.id];\n}\nreturn $input.all();\n"
+      }
+    },
+    {
+      "id": "n8",
+      "name": "Code: Read Plan from Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2120,
+        480
+      ],
+      "parameters": {
+        "jsCode": "\nconst body = $input.first().json.body;\nreturn [{\n  json: {\n    jobId:    body.jobId,\n    issueIid: body.issueIid,\n    planPath: body.planPath,\n    plan:     body.plan,\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "n9",
+      "name": "Code: Prepare Comment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2320,
+        480
+      ],
+      "parameters": {
+        "jsCode": "\nconst inp = $input.first().json;\nreturn [{\n  json: {\n    jobId:       inp.jobId,\n    issueIid:    inp.issueIid,\n    planPath:    inp.planPath,\n    plan:        inp.plan,\n    commentBody: '## \\ud83e\\udd16 KI-Implementierungsplan\\n\\n' + inp.plan,\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "n10",
+      "name": "HTTP: Post GitLab Comment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2520,
+        480
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://gitlab.com/api/v4/projects/80799805/issues/{{ $json.issueIid }}/notes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "body",
+              "value": "={{ $json.commentBody }}"
+            }
+          ]
+        },
+        "options": {},
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "B9S1C8lPlkOpXGxm",
+          "name": "GitLab API Token"
+        }
+      }
+    },
+    {
+      "id": "n11",
+      "name": "HTTP: Swap Labels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2720,
+        480
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://gitlab.com/api/v4/projects/80799805/issues/{{ $('Code: Prepare Comment').item.json.issueIid }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "remove_labels",
+              "value": "Plan,Agent"
+            },
+            {
+              "name": "add_labels",
+              "value": "Plan Review"
+            }
+          ]
+        },
+        "options": {},
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "B9S1C8lPlkOpXGxm",
+          "name": "GitLab API Token"
+        }
+      }
+    },
+    {
+      "id": "n12",
+      "name": "Webhook: Pending Jobs Internal",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        680
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "ai-planner-pending-jobs",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "ai-planner-pending-jobs-v1"
+    },
+    {
+      "id": "n13",
+      "name": "Code: List Pending Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        680
+      ],
+      "parameters": {
+        "jsCode": "\nconst dev = $input.first().json.query?.dev ?? '';\nconst staticData = $getWorkflowStaticData('global');\nconst allJobs = Object.values(staticData.pendingJobs ?? {});\nconst jobs = dev ? allJobs.filter(j => j.assignee === dev) : allJobs;\nreturn [{ json: { jobs } }];\n"
+      }
+    },
+    {
+      "id": "n14",
+      "name": "Respond: Pending Jobs",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        680
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      }
+    },
+    {
+      "id": "fetch-current-issue-01",
+      "name": "HTTP: Fetch Current Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        680
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://gitlab.com/api/v4/projects/80799805/issues/{{ $('Webhook: GitLab Issue').item.json.body.object_attributes.iid }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {},
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "B9S1C8lPlkOpXGxm",
+          "name": "GitLab API Token"
+        }
+      }
+    },
+    {
+      "id": "poll-schedule-01",
+      "name": "Schedule: Issue Poller",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        280
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "poll-list-issues-02",
+      "name": "HTTP: List Plan+Agent Issues",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        280
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/80799805/issues",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "labels",
+              "value": "Plan,Agent"
+            },
+            {
+              "name": "state",
+              "value": "opened"
+            },
+            {
+              "name": "per_page",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {},
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "B9S1C8lPlkOpXGxm",
+          "name": "GitLab API Token"
+        }
+      }
+    },
+    {
+      "id": "poll-filter-03",
+      "name": "Code: Filter Unqueued Issues",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        280
+      ],
+      "parameters": {
+        "jsCode": "\n// GitLab API returns issues as a JSON array — httpRequest wraps it as a single item\nconst allItems = $input.all();\nlet issues = [];\nif (allItems.length === 1 && Array.isArray(allItems[0].json)) {\n  issues = allItems[0].json;\n} else {\n  issues = allItems.map(item => item.json);\n}\n\n// Layer 2 dedup: skip any issue already registered in pendingJobs\n// (covers the case where the webhook fired and registered the job before the poller ran)\nconst staticData = $getWorkflowStaticData('global');\nconst pendingIids = new Set(\n  Object.values(staticData.pendingJobs ?? {}).map(j => Number(j.issueIid))\n);\n\nconst unqueued = issues.filter(issue => !pendingIids.has(Number(issue.iid)));\n\n// No unqueued issues — nothing to trigger\nif (unqueued.length === 0) return [];\n\nreturn unqueued.map(issue => ({\n  json: {\n    iid: issue.iid,\n    title: issue.title ?? '',\n    description: issue.description ?? '',\n    assignee: issue.assignees?.[0]?.username ?? '',\n  }\n}));\n"
+      }
+    },
+    {
+      "id": "poll-trigger-04",
+      "name": "HTTP: Trigger Planning for Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        280
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.cardyard.de/webhook/gitlab-issue-intake",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-gitlab-token",
+              "value": "1aa775b82eca4db73fb36a775f652c83459dd1d1dacb317641a9b1b5f3380b34"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ object_attributes: { iid: $json.iid, title: $json.title, description: $json.description, action: 'update' }, assignees: [{ username: $json.assignee }], labels: [], project: { id: 80799805 } }) }}",
+        "options": {},
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      }
+    },
+    {
+      "id": "maint-rmjob-wh-01",
+      "name": "Webhook: Remove Job",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        80
+      ],
+      "parameters": {
+        "httpMethod": "DELETE",
+        "path": "ai-planner-remove-job",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "ai-planner-remove-job-v1"
+    },
+    {
+      "id": "maint-rmjob-code-02",
+      "name": "Code: Remove Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        80
+      ],
+      "parameters": {
+        "jsCode": "\nconst body = $input.first().json.body ?? {};\nconst jobId = String(body.jobId ?? '');\n\nif (!jobId) {\n  return [{ json: { ok: false, error: 'jobId required in request body' } }];\n}\n\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.pendingJobs) staticData.pendingJobs = {};\n\nif (staticData.pendingJobs[jobId] !== undefined) {\n  delete staticData.pendingJobs[jobId];\n  const remaining = Object.keys(staticData.pendingJobs).length;\n  return [{ json: { ok: true, removed: jobId, remaining } }];\n} else {\n  return [{ json: { ok: false, error: `jobId ${jobId} not found in pendingJobs` } }];\n}\n"
+      }
+    },
+    {
+      "id": "maint-rmjob-resp-03",
+      "name": "Respond: Job Removed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        80
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Received"
+      },
+      "id": "270ed2c2-3249-45f2-9897-1859ed39aa28",
+      "name": "Respond: Received",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        520,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: GitLab Issue": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Fetch Current Issue",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond: Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Validate & Check": {
+      "main": [
+        [
+          {
+            "node": "IF: Should Process?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Should Process?": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Ignore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Job": {
+      "main": [
+        [
+          {
+            "node": "Code: Register Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Register Job": {
+      "main": [
+        [
+          {
+            "node": "Respond: Acknowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond: Acknowledge": {
+      "main": [
+        [
+          {
+            "node": "Wait: Resume Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait: Resume Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code: Deregister Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Deregister Job": {
+      "main": [
+        [
+          {
+            "node": "Code: Read Plan from Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Read Plan from Body": {
+      "main": [
+        [
+          {
+            "node": "Code: Prepare Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Prepare Comment": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Post GitLab Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Post GitLab Comment": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Swap Labels",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Webhook: Pending Jobs Internal": {
+      "main": [
+        [
+          {
+            "node": "Code: List Pending Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: List Pending Jobs": {
+      "main": [
+        [
+          {
+            "node": "Respond: Pending Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Fetch Current Issue": {
+      "main": [
+        [
+          {
+            "node": "Code: Validate & Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Schedule: Issue Poller": {
+      "main": [
+        [
+          {
+            "node": "HTTP: List Plan+Agent Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: List Plan+Agent Issues": {
+      "main": [
+        [
+          {
+            "node": "Code: Filter Unqueued Issues",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code: Filter Unqueued Issues": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Trigger Planning for Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: Remove Job": {
+      "main": [
+        [
+          {
+            "node": "Code: Remove Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Remove Job": {
+      "main": [
+        [
+          {
+            "node": "Respond: Job Removed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Swap Labels": {},
+    "HTTP: Trigger Planning for Issue": {}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": {
+    "global": {
+      "pendingJobs": {}
+    }
+  },
+  "meta": {},
+  "pinData": {},
+  "versionId": "de5b851c-4981-4a0b-847d-383e367b011a",
+  "_meta": {
+    "globalHandlers": []
+  }
+}

@@ -1,0 +1,1035 @@
+{
+  "id": "I0OYaf3Y6jjSOV0o",
+  "name": "GitLab to Miro Mindmap",
+  "nodes": [
+    {
+      "id": "trigger-01",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        320,
+        280
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "gitlab-fetch-01",
+      "name": "HTTP: Fetch GitLab Issues",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        520,
+        280
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "GET",
+        "url": "https://gitlab.com/api/v4/projects/80799805/issues",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "state",
+              "value": "opened"
+            },
+            {
+              "name": "per_page",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "page",
+                    "value": "={{ $pageCount + 1 }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $response.body.length < 100 }}"
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "B9S1C8lPlkOpXGxm",
+          "name": "GitLab API Token"
+        }
+      }
+    },
+    {
+      "id": "code-prep-mistral-01",
+      "name": "Code: Prep Titles for Mistral",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\nlet issues = [];\nif (allItems.length === 1 && Array.isArray(allItems[0].json)) {\n  issues = allItems[0].json;\n} else {\n  issues = allItems.map(i => i.json);\n}\n\nconst lines = issues.map(i => `${i.iid}: ${i.title}`).join('\\n');\n\nconst prompt = `Formuliere jeden der folgenden GitLab-Issue-Titel fuer eine Mindmap um.\\nJeder Titel soll max. 5 Woerter haben, praegnant auf Deutsch.\\nAntworte NUR mit einem JSON-Objekt: { \"<iid>\": \"<kurztitel>\", ... }\\n\\nIssues:\\n${lines}`;\n\nreturn [{ json: { prompt, _rawIssues: issues } }];"
+      }
+    },
+    {
+      "id": "chain-llm-01",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        920,
+        280
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "code-parse-mistral-01",
+      "name": "Code: Parse Mistral Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\n// chainLlm outputs { response: \"...\" } or { text: \"...\" } or directly the string\nlet content = resp.response || resp.text || '{}';\n// Try parsing as JSON (Mistral json_object format)\ntry {\n  const parsed = JSON.parse(content);\n  content = JSON.stringify(parsed);\n} catch(e) {}\n// Parse short titles\nlet shortTitles = {};\ntry { shortTitles = JSON.parse(content); } catch(e) {}\n\nconst rawIssues = $('Code: Prep Titles for Mistral').first().json._rawIssues;\nreturn [{ json: { shortTitles, _rawIssues: rawIssues } }];"
+      }
+    },
+    {
+      "id": "code-group-01",
+      "name": "Code: Group Issues",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const { shortTitles, _rawIssues: issues } = $input.first().json;\n\nconst shorten = (title, iid) => {\n  const s = shortTitles[String(iid)];\n  if (s) return s;\n  return title.length > 40 ? title.slice(0, 39) + '\\u2026' : title;\n};\n\nconst msMap = {};\nfor (const issue of issues) {\n  const ms = issue.milestone?.title ?? 'Kein Milestone';\n  const sortedLabels = (issue.labels ?? []).sort();\n  const primaryLabel = sortedLabels[0] ?? 'Kein Label';\n  if (!msMap[ms]) msMap[ms] = {};\n  if (!msMap[ms][primaryLabel]) msMap[ms][primaryLabel] = [];\n  msMap[ms][primaryLabel].push({ short: shorten(issue.title, issue.iid), iid: issue.iid, url: issue.web_url, labels: sortedLabels });\n}\n\nconst groups = Object.entries(msMap).map(([ms, labels]) => ({\n  milestoneTitle: ms,\n  _tempId: `m_${ms}`,\n  labels: Object.entries(labels).map(([lb, iss]) => ({\n    labelName: lb,\n    _tempId: `l_${ms}_${lb}`,\n    issues: iss\n  }))\n}));\n\nreturn [{ json: { groups } }];"
+      }
+    },
+    {
+      "id": "code-init-map-01",
+      "name": "Code: Init Map",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1660,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const sd = $getWorkflowStaticData('global');\nsd.miroMap = {};\nsd.posMap = {};\nreturn $input.all();"
+      }
+    },
+    {
+      "id": "miro-get-nodes-01",
+      "name": "HTTP: GET Miro Nodes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1860,
+        280
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.miro.com/v2-experimental/boards/uXjVHPe8zqc=/mindmap_nodes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "miroOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {},
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "miroOAuth2Api": {
+          "id": "NlMZryJcTXTVNqzF",
+          "name": "Miro account"
+        }
+      }
+    },
+    {
+      "id": "code-find-root-01",
+      "name": "Code: Find Root",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst nodes = resp.data ?? [];\nconst sd = $getWorkflowStaticData('global');\nsd.allNodeIds = nodes.map(n => String(n.id));\nreturn [{ json: { total: resp.total ?? 0 } }];"
+      }
+    },
+    {
+      "id": "if-has-nodes-01",
+      "name": "IF: Board Has Nodes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2260,
+        280
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.total }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "code-prep-delete-01",
+      "name": "Code: Prep Delete IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2460,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const sd = $getWorkflowStaticData('global');\nconst ids = sd.allNodeIds || [];\nif (ids.length === 0) return [{ json: { nodeId: '' } }];\nreturn ids.map(id => ({ json: { nodeId: id } }));"
+      }
+    },
+    {
+      "id": "miro-delete-nodes-01",
+      "name": "HTTP: DELETE Nodes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2660,
+        80
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ 'https://api.miro.com/v2-experimental/boards/uXjVHPe8zqc=/mindmap_nodes/' + $json.nodeId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "miroOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 200
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "miroOAuth2Api": {
+          "id": "NlMZryJcTXTVNqzF",
+          "name": "Miro account"
+        }
+      }
+    },
+    {
+      "id": "code-after-delete-01",
+      "name": "Code: After Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: { status: 'pass1_done' } }];"
+      }
+    },
+    {
+      "id": "miro-get-nodes-02",
+      "name": "HTTP: GET Miro Nodes 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3060,
+        80
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.miro.com/v2-experimental/boards/uXjVHPe8zqc=/mindmap_nodes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "miroOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {},
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "miroOAuth2Api": {
+          "id": "NlMZryJcTXTVNqzF",
+          "name": "Miro account"
+        }
+      }
+    },
+    {
+      "id": "code-extract-remaining-01",
+      "name": "Code: Extract Remaining",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3260,
+        80
+      ],
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst nodes = resp.data ?? [];\nconst sd = $getWorkflowStaticData('global');\nsd.allNodeIds = nodes.map(n => String(n.id));\nreturn [{ json: { remaining: nodes.length } }];"
+      }
+    },
+    {
+      "id": "if-any-remaining-01",
+      "name": "IF: Any Remaining?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3460,
+        80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.remaining }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "code-prep-delete-02",
+      "name": "Code: Prep Delete IDs 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3660,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const sd = $getWorkflowStaticData('global');\nconst ids = sd.allNodeIds || [];\nreturn ids.map(id => ({ json: { nodeId: id } }));"
+      }
+    },
+    {
+      "id": "miro-delete-nodes-02",
+      "name": "HTTP: DELETE Nodes 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3860,
+        80
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ 'https://api.miro.com/v2-experimental/boards/uXjVHPe8zqc=/mindmap_nodes/' + $json.nodeId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "miroOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 200
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "miroOAuth2Api": {
+          "id": "NlMZryJcTXTVNqzF",
+          "name": "Miro account"
+        }
+      }
+    },
+    {
+      "id": "code-after-delete-02",
+      "name": "Code: After Delete 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4060,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: { status: 'pass2_done' } }];"
+      }
+    },
+    {
+      "id": "miro-post-root-01",
+      "name": "HTTP: POST Root",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4260,
+        280
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.miro.com/v2-experimental/boards/uXjVHPe8zqc=/mindmap_nodes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "miroOAuth2Api",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { nodeView: { data: { type: 'text', content: 'CardYard Backlog' } } } }) }}",
+        "options": {},
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "miroOAuth2Api": {
+          "id": "NlMZryJcTXTVNqzF",
+          "name": "Miro account"
+        }
+      }
+    },
+    {
+      "id": "code-prep-milestones-01",
+      "name": "Code: Prep Milestones",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4460,
+        280
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const groups = $('Code: Group Issues').first().json.groups;\nconst rootId = String($('HTTP: POST Root').first().json.id);\nconst sd = $getWorkflowStaticData('global');\nsd.posMap = {};\n\nconst ISSUE_H = 70;\nconst LABEL_PAD = 40;\nconst MS_PAD = 60;\nconst MS_X = 300;\n\nfunction msHeight(g) {\n  return g.labels.reduce((s, l) => s + l.issues.length * ISSUE_H, 0) + Math.max(0, g.labels.length - 1) * LABEL_PAD;\n}\n\nconst totalH = groups.reduce((s, g) => s + msHeight(g), 0) + Math.max(0, groups.length - 1) * MS_PAD;\nlet y = -totalH / 2;\nconst items = [];\nfor (const g of groups) {\n  const h = msHeight(g);\n  const msY = Math.round(y + h / 2);\n  sd.posMap[g._tempId] = msY;\n  items.push({ json: { content: g.milestoneTitle, _tempId: g._tempId, _parentId: rootId, _posX: MS_X, _posY: msY, _nodeColor: '#4fc3f7', _fillOpacity: '0.2' } });\n  y += h + MS_PAD;\n}\nreturn items;"
+      }
+    },
+    {
+      "id": "miro-post-milestone-01",
+      "name": "HTTP: POST Milestone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4660,
+        280
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.miro.com/v2-experimental/boards/uXjVHPe8zqc=/mindmap_nodes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "miroOAuth2Api",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { nodeView: { data: { type: 'text', content: $json.content } } }, parent: { id: $json._parentId }, position: { x: $json._posX, y: $json._posY }, geometry: { width: 280 } }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "miroOAuth2Api": {
+          "id": "NlMZryJcTXTVNqzF",
+          "name": "Miro account"
+        }
+      }
+    },
+    {
+      "id": "code-collect-milestone-ids-01",
+      "name": "Code: Collect Milestone IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4860,
+        280
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const sd = $getWorkflowStaticData('global');\nif (!sd.miroMap) sd.miroMap = {};\nconst httpResponses = $input.all();\nconst prepItems = $('Code: Prep Milestones').all();\nfor (let i = 0; i < Math.min(httpResponses.length, prepItems.length); i++) {\n  sd.miroMap[prepItems[i].json._tempId] = String(httpResponses[i].json.id);\n}\nreturn [{ json: { collected: httpResponses.length } }];"
+      }
+    },
+    {
+      "id": "code-prep-labels-01",
+      "name": "Code: Prep Labels",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5060,
+        280
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const groups = $('Code: Group Issues').first().json.groups;\nconst sd = $getWorkflowStaticData('global');\n\nconst ISSUE_H = 70;\nconst LABEL_PAD = 40;\nconst LABEL_X = 600;\n\nconst items = [];\nfor (const g of groups) {\n  const milestoneId = sd.miroMap[g._tempId];\n  const msY = sd.posMap[g._tempId] || 0;\n  const totalH = g.labels.reduce((s, l) => s + l.issues.length * ISSUE_H, 0) + Math.max(0, g.labels.length - 1) * LABEL_PAD;\n  let y = msY - totalH / 2;\n  for (const l of g.labels) {\n    const h = l.issues.length * ISSUE_H;\n    const labelY = Math.round(y + h / 2);\n    sd.posMap[l._tempId] = labelY;\n    items.push({ json: { content: l.labelName, _tempId: l._tempId, _parentId: milestoneId, _posX: LABEL_X, _posY: labelY, _nodeColor: '#81c784', _fillOpacity: '0.15' } });\n    y += h + LABEL_PAD;\n  }\n}\nreturn items;"
+      }
+    },
+    {
+      "id": "miro-post-label-01",
+      "name": "HTTP: POST Label",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5260,
+        280
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.miro.com/v2-experimental/boards/uXjVHPe8zqc=/mindmap_nodes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "miroOAuth2Api",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { nodeView: { data: { type: 'text', content: $json.content } } }, parent: { id: $json._parentId }, position: { x: $json._posX, y: $json._posY }, geometry: { width: 280 } }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "miroOAuth2Api": {
+          "id": "NlMZryJcTXTVNqzF",
+          "name": "Miro account"
+        }
+      }
+    },
+    {
+      "id": "code-collect-label-ids-01",
+      "name": "Code: Collect Label IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5460,
+        280
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const sd = $getWorkflowStaticData('global');\nif (!sd.miroMap) sd.miroMap = {};\nconst httpResponses = $input.all();\nconst prepItems = $('Code: Prep Labels').all();\nfor (let i = 0; i < Math.min(httpResponses.length, prepItems.length); i++) {\n  sd.miroMap[prepItems[i].json._tempId] = String(httpResponses[i].json.id);\n}\nreturn [{ json: { collected: httpResponses.length } }];"
+      }
+    },
+    {
+      "id": "code-prep-issues-01",
+      "name": "Code: Prep Issues",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5660,
+        280
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const groups = $('Code: Group Issues').first().json.groups;\nconst sd = $getWorkflowStaticData('global');\n\nconst ISSUE_H = 70;\nconst ISSUE_X = 900;\n\nfunction issueColor(labels) {\n  if (!labels || !labels.length) return { nodeColor: '#ba68c8' };\n  const ls = labels.map(l => l.toLowerCase());\n  if (ls.some(l => l.includes('type: bug') || l.includes('type::bug'))) return { nodeColor: '#e57373' };\n  if (ls.some(l => l.includes('type: feature') || l.includes('type::feature'))) return { nodeColor: '#64b5f6' };\n  if (ls.some(l => l.includes('type: task') || l.includes('type::task'))) return { nodeColor: '#ffb74d' };\n  if (ls.some(l => l.includes('type: enhancement') || l.includes('type::enhancement'))) return { nodeColor: '#4dd0e1' };\n  return { nodeColor: '#ba68c8' };\n}\n\nconst items = [];\nfor (const g of groups) {\n  for (const l of g.labels) {\n    const labelId = sd.miroMap[l._tempId];\n    const labelY = sd.posMap[l._tempId] || 0;\n    const n = l.issues.length;\n    l.issues.forEach((issue, idx) => {\n      const issueY = Math.round(labelY + (idx - (n - 1) / 2) * ISSUE_H);\n      const content = `#${issue.iid} ${issue.short}`;\n      const colors = issueColor(issue.labels || []);\n      items.push({ json: { content, _parentId: labelId, iid: issue.iid, _posX: ISSUE_X, _posY: issueY, _nodeColor: colors.nodeColor, _fillOpacity: '0.15' } });\n    });\n  }\n}\nreturn items;"
+      }
+    },
+    {
+      "id": "miro-post-issue-01",
+      "name": "HTTP: POST Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5860,
+        280
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.miro.com/v2-experimental/boards/uXjVHPe8zqc=/mindmap_nodes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "miroOAuth2Api",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { nodeView: { data: { type: 'text', content: $json.content } } }, parent: { id: $json._parentId }, position: { x: $json._posX, y: $json._posY }, geometry: { width: 280 } }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "miroOAuth2Api": {
+          "id": "NlMZryJcTXTVNqzF",
+          "name": "Miro account"
+        }
+      }
+    },
+    {
+      "id": "code-cleanup-01",
+      "name": "Code: Cleanup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6060,
+        280
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const sd = $getWorkflowStaticData('global');\nsd.miroMap = {};\nsd.posMap = {};\nreturn [{ json: { status: 'done' } }];"
+      }
+    },
+    {
+      "id": "mistral-langchain-model-01",
+      "name": "Mistral Cloud Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        920,
+        480
+      ],
+      "parameters": {
+        "model": "mistral-small-latest",
+        "options": {}
+      },
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "23WSuT3Imx234z40",
+          "name": "Mistral Cloud account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Fetch GitLab Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Fetch GitLab Issues": {
+      "main": [
+        [
+          {
+            "node": "Code: Prep Titles for Mistral",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code: Prep Titles for Mistral": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code: Parse Mistral Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Parse Mistral Response": {
+      "main": [
+        [
+          {
+            "node": "Code: Group Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Group Issues": {
+      "main": [
+        [
+          {
+            "node": "Code: Init Map",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Init Map": {
+      "main": [
+        [
+          {
+            "node": "HTTP: GET Miro Nodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: GET Miro Nodes": {
+      "main": [
+        [
+          {
+            "node": "Code: Find Root",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code: Find Root": {
+      "main": [
+        [
+          {
+            "node": "IF: Board Has Nodes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Board Has Nodes?": {
+      "main": [
+        [
+          {
+            "node": "Code: Prep Delete IDs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: POST Root",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Prep Delete IDs": {
+      "main": [
+        [
+          {
+            "node": "HTTP: DELETE Nodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: DELETE Nodes": {
+      "main": [
+        [
+          {
+            "node": "Code: After Delete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code: After Delete": {
+      "main": [
+        [
+          {
+            "node": "HTTP: GET Miro Nodes 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: GET Miro Nodes 2": {
+      "main": [
+        [
+          {
+            "node": "Code: Extract Remaining",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code: Extract Remaining": {
+      "main": [
+        [
+          {
+            "node": "IF: Any Remaining?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Any Remaining?": {
+      "main": [
+        [
+          {
+            "node": "Code: Prep Delete IDs 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: POST Root",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Prep Delete IDs 2": {
+      "main": [
+        [
+          {
+            "node": "HTTP: DELETE Nodes 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: DELETE Nodes 2": {
+      "main": [
+        [
+          {
+            "node": "Code: After Delete 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code: After Delete 2": {
+      "main": [
+        [
+          {
+            "node": "HTTP: POST Root",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: POST Root": {
+      "main": [
+        [
+          {
+            "node": "Code: Prep Milestones",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code: Prep Milestones": {
+      "main": [
+        [
+          {
+            "node": "HTTP: POST Milestone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: POST Milestone": {
+      "main": [
+        [
+          {
+            "node": "Code: Collect Milestone IDs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code: Collect Milestone IDs": {
+      "main": [
+        [
+          {
+            "node": "Code: Prep Labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Prep Labels": {
+      "main": [
+        [
+          {
+            "node": "HTTP: POST Label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: POST Label": {
+      "main": [
+        [
+          {
+            "node": "Code: Collect Label IDs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code: Collect Label IDs": {
+      "main": [
+        [
+          {
+            "node": "Code: Prep Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Prep Issues": {
+      "main": [
+        [
+          {
+            "node": "HTTP: POST Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: POST Issue": {
+      "main": [
+        [
+          {
+            "node": "Code: Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "_meta": {
+    "globalHandlers": []
+  }
+}

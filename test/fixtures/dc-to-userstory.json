@@ -1,0 +1,1235 @@
+{
+  "id": "k01VkBNMaMe8Da3R",
+  "name": "DC to Userstory",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "type": "message-reaction-add",
+        "guildIds": [
+          "1492092666945605662"
+        ],
+        "channelIds": [
+          "1492092922189971618"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-discord-trigger.discordTrigger",
+      "typeVersion": 1,
+      "position": [
+        320,
+        80
+      ],
+      "id": "788f9354-b970-43c6-b9d7-f697f18fa821",
+      "name": "Discord Trigger",
+      "credentials": {
+        "discordBotTriggerApi": {
+          "id": "vGpFU3waf9PZAXGf",
+          "name": "Discord Bot Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0fa31d5c-2b04-4465-8e6c-650713c23856",
+              "leftValue": "={{ $json.emojiId.name }}",
+              "rightValue": "💡",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "ad014d8e-1b11-421e-8179-26a22ba644f3",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        80
+      ],
+      "id": "3138bac0-177c-4564-956a-6a44c1911cf1",
+      "name": "If 💡"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1aa22b33-c44d-5566-e77f-889900aabbcc",
+              "leftValue": "={{ $json.emojiId.name }}",
+              "rightValue": "🐛",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "2bb33c44-d55e-6677-f88a-99aabbccdd00",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        280
+      ],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567891",
+      "name": "If 🐛"
+    },
+    {
+      "parameters": {
+        "url": "=https://discord.com/api/v10/channels/{{ $json.channelId }}/messages/{{ $json.messageId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "discordBotApi",
+        "options": {},
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        720,
+        80
+      ],
+      "id": "a55426ef-0243-44ab-adb5-ab3caed5e284",
+      "name": "Load message content",
+      "credentials": {
+        "discordBotApi": {
+          "id": "zDyZ6GajOJRXLGJv",
+          "name": "Discord Bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://discord.com/api/v10/channels/{{ $json.channelId }}/messages/{{ $json.messageId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "discordBotApi",
+        "options": {},
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        920,
+        280
+      ],
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678902",
+      "name": "Load message content (Bug)",
+      "credentials": {
+        "discordBotApi": {
+          "id": "zDyZ6GajOJRXLGJv",
+          "name": "Discord Bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sa001111-0000-4000-8000-000000000001",
+              "name": "_type",
+              "value": "story",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        80
+      ],
+      "id": "f1a00001-0000-4000-8000-000000000001",
+      "name": "Set: story"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sa002222-0000-4000-8000-000000000001",
+              "name": "_type",
+              "value": "bug",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        280
+      ],
+      "id": "f1a00002-0000-4000-8000-000000000002",
+      "name": "Set: bug"
+    },
+    {
+      "parameters": {
+        "jsCode": "const attachments = $input.item.json.attachments ?? [];\nconst images = attachments.filter(a => a.content_type?.startsWith('image/'));\nconst enriched = images.map(img => ({\n  ...img,\n  _content: $input.item.json.content ?? '',\n  _type:    $input.item.json._type,\n}));\nreturn {\n  json: {\n    ...$input.item.json,\n    _images: enriched,\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        80
+      ],
+      "id": "f1a00003-0000-4000-8000-000000000003",
+      "name": "Code: Extract images"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ha001111-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json._images.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        80
+      ],
+      "id": "f1a00004-0000-4000-8000-000000000004",
+      "name": "IF: Has images"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "_images",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1720,
+        80
+      ],
+      "id": "f1a00005-0000-4000-8000-000000000005",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sn001111-0000-4000-8000-000000000001",
+              "name": "_url",
+              "value": "={{ $json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "sn001111-0000-4000-8000-000000000002",
+              "name": "_filename",
+              "value": "={{ $json.filename }}",
+              "type": "string"
+            },
+            {
+              "id": "sn001111-0000-4000-8000-000000000003",
+              "name": "_content",
+              "value": "={{ $json._content }}",
+              "type": "string"
+            },
+            {
+              "id": "sn001111-0000-4000-8000-000000000004",
+              "name": "_type",
+              "value": "={{ $json._type }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        80
+      ],
+      "id": "f1a00006-0000-4000-8000-000000000006",
+      "name": "Set: Snapshot context"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json._url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2120,
+        80
+      ],
+      "id": "f1a00007-0000-4000-8000-000000000007",
+      "name": "HTTP: Download image"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ra001111-0000-4000-8000-000000000001",
+              "name": "_content",
+              "value": "={{ $('Set: Snapshot context').item.json._content }}",
+              "type": "string"
+            },
+            {
+              "id": "ra001111-0000-4000-8000-000000000002",
+              "name": "_type",
+              "value": "={{ $('Set: Snapshot context').item.json._type }}",
+              "type": "string"
+            },
+            {
+              "id": "ra001111-0000-4000-8000-000000000003",
+              "name": "_filename",
+              "value": "={{ $('Set: Snapshot context').item.json._filename }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2320,
+        80
+      ],
+      "id": "f1a00008-0000-4000-8000-000000000008",
+      "name": "Set: Re-attach after download"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gitlab.com/api/v4/projects/botilicious%2Fcardyard-manage/uploads",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gitlabApi",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {},
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2520,
+        80
+      ],
+      "id": "f1a00009-0000-4000-8000-000000000009",
+      "name": "HTTP: Upload to GitLab",
+      "credentials": {
+        "gitlabApi": {
+          "id": "KTCHMKP6R5WUZRae",
+          "name": "GitLab account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "em001111-0000-4000-8000-000000000001",
+              "name": "markdown",
+              "value": "={{ $json.markdown }}",
+              "type": "string"
+            },
+            {
+              "id": "em001111-0000-4000-8000-000000000002",
+              "name": "_content",
+              "value": "={{ $('Set: Snapshot context').item.json._content }}",
+              "type": "string"
+            },
+            {
+              "id": "em001111-0000-4000-8000-000000000003",
+              "name": "_type",
+              "value": "={{ $('Set: Snapshot context').item.json._type }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2720,
+        80
+      ],
+      "id": "f1a00010-0000-4000-8000-000000000010",
+      "name": "Set: Extract markdown"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateIndividualFields",
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "markdown",
+              "renameField": true,
+              "outputFieldName": "markdowns"
+            }
+          ]
+        },
+        "include": "specifiedFields",
+        "fieldsToInclude": {
+          "fields": [
+            {
+              "fieldName": "_content"
+            },
+            {
+              "fieldName": "_type"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2920,
+        80
+      ],
+      "id": "f1a00011-0000-4000-8000-000000000011",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "jsCode": "const markdowns = $json.markdowns ?? [];\nconst imageSection = markdowns.length > 0\n  ? `\\n\\n## Screenshots\\n${markdowns.join('\\n')}`\n  : '';\nconst snapshot = $('Set: Snapshot context').item.json;\nconst content = snapshot._content ?? '';\nconst type = snapshot._type ?? '';\nlet msgId = '';\ntry { msgId = $('Discord Trigger').item.json.id ?? ''; } catch(e) {}\nreturn {\n  json: {\n    _enrichedContent: content + imageSection,\n    _imageSection: imageSection,\n    _type: type,\n    _originalContent: content,\n    _messageId: msgId,\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        80
+      ],
+      "id": "f1a00012-0000-4000-8000-000000000012",
+      "name": "Code: Build enriched content"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  json: {\n    _enrichedContent: $json.content ?? '',\n    _imageSection: '',\n    _type: $json._type ?? '',\n    _originalContent: $json.content ?? '',\n    _messageId: $json.id ?? '',\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        280
+      ],
+      "id": "f1a00013-0000-4000-8000-000000000013",
+      "name": "Code: Build enriched content (no images)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rt001111-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json._type }}",
+              "rightValue": "story",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3320,
+        280
+      ],
+      "id": "f1a00014-0000-4000-8000-000000000014",
+      "name": "IF: Route by type"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json._enrichedContent }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Du bist ein erfahrener Product Owner für CardYard – eine Magic: The Gathering Sammelkarten-Plattform.\n\n## Projektkontext\nCardYard ermöglicht MTG-Sammlern, ihre Karten zu verwalten, zu kaufen, zu verkaufen und per KI zu identifizieren.\n\n## Bestehende Features\n- Karten-Katalog mit Suche und Filterung\n- Kartendetailseiten mit Preisinformationen\n- KI-Kartenerkennung (Foto hochladen → Karte wird erkannt, powered by CLIP-ONNX)\n- Sammlungen verwalten (hinzufügen, entfernen, Items organisieren)\n- Karten verkaufen (Angebote erstellen, Preis setzen)\n- Warenkorb und Checkout-Prozess\n- Nutzerprofil und Einstellungen\n- Chat zwischen Käufer und Verkäufer\n\n## Backend-Module\n- :mtg – Collections, Items, Angebote (Kern-Domäne)\n- :user – Nutzerverwaltung\n- :recognition – KI-Kartenerkennung\n- :importer – MTGJSON-Datenimport\n\n## Nutzertypologie\nSammler, Verkäufer, Käufer, Admin\n\n## Aufgabe\nWandle die folgende Discord-Nachricht in eine GitLab User Story um.\nWähle den passenden Nutzertyp aus der Nutzertypologie.\nFormuliere präzise, testbare Akzeptanzkriterien (mindestens 2).\n\nAntworte NUR mit validem JSON, kein Markdown, keine Erklärung:\n{\n  \"title\": \"<kurzer, beschreibender Titel, max 60 Zeichen>\",\n  \"description\": \"Als [Nutzertyp] möchte ich [Funktion], damit [Nutzen].\\n\\n## Akzeptanzkriterien\\n- [ ] ...\\n- [ ] ...\"\n}\n"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        3520,
+        280
+      ],
+      "id": "622d87c0-89ee-48d9-bb98-182505115525",
+      "name": "Basic LLM Chain",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json._enrichedContent }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Du bist ein erfahrener QA-Engineer für CardYard – eine Magic: The Gathering Sammelkarten-Plattform.\n\n## Projektkontext\nCardYard ermöglicht MTG-Sammlern, ihre Karten zu verwalten, zu kaufen, zu verkaufen und per KI zu identifizieren.\n\n## Bestehende Features\n- Karten-Katalog mit Suche und Filterung\n- Kartendetailseiten mit Preisinformationen\n- KI-Kartenerkennung (Foto hochladen → Karte wird erkannt, powered by CLIP-ONNX)\n- Sammlungen verwalten (hinzufügen, entfernen, Items organisieren)\n- Karten verkaufen (Angebote erstellen, Preis setzen)\n- Warenkorb und Checkout-Prozess\n- Nutzerprofil und Einstellungen\n- Chat zwischen Käufer und Verkäufer\n\n## Aufgabe\nWandle die folgende Discord-Nachricht in einen strukturierten GitLab Bug Report um.\nExtrahiere so viele Informationen wie möglich aus der Nachricht.\nFehlende Informationen mit \"[Bitte ergänzen]\" markieren.\n\nAntworte NUR mit validem JSON, kein Markdown, keine Erklärung:\n{\n  \"title\": \"Bug: <kurze Fehlerbeschreibung, max 55 Zeichen>\",\n  \"description\": \"## Fehlerbeschreibung\\n[Was ist das Problem?]\\n\\n## Schritte zur Reproduktion\\n1. ...\\n2. ...\\n\\n## Erwartetes Verhalten\\n[Was sollte passieren?]\\n\\n## Tatsächliches Verhalten\\n[Was passiert stattdessen?]\\n\\n## Mögliche Ursache\\n[Optional: Erste Hypothese oder [Bitte ergänzen]]\"\n}\n"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        3520,
+        480
+      ],
+      "id": "d4e5f6a7-b8c9-0123-def0-234567890124",
+      "name": "Basic LLM Chain (Bug)",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": "mistral-small-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        3520,
+        480
+      ],
+      "id": "df692c13-d923-4e76-a864-081fbf33b3ad",
+      "name": "Mistral Cloud Chat Model",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "23WSuT3Imx234z40",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "mistral-small-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        3520,
+        680
+      ],
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789013",
+      "name": "Mistral Cloud Chat Model (Bug)",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "23WSuT3Imx234z40",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "owner": "botilicious",
+        "repository": "cardyard-manage",
+        "title": "={{ $json._parsedTitle }}",
+        "body": "={{ $json._parsedDescription + ($json._imageSection || '') + \"\\n\\n---\\n**Gemeldet von:** \" + ($('Discord Trigger').item.json.globalName || $('Discord Trigger').item.json.username) + \"\\n**Original:** \" + ($json._originalContent || '') }}",
+        "labels": [
+          "type::feature"
+        ],
+        "assignee_ids": []
+      },
+      "type": "n8n-nodes-base.gitlab",
+      "typeVersion": 1,
+      "position": [
+        4060,
+        280
+      ],
+      "id": "65a8436a-0816-46fc-897d-3587a2f5e24a",
+      "name": "Create an issue",
+      "credentials": {
+        "gitlabApi": {
+          "id": "KTCHMKP6R5WUZRae",
+          "name": "GitLab account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "owner": "botilicious",
+        "repository": "cardyard-manage",
+        "title": "={{ $json._parsedTitle }}",
+        "body": "={{ $json._parsedDescription + ($json._imageSection || '') + \"\\n\\n---\\n**Gemeldet von:** \" + ($('Discord Trigger').item.json.globalName || $('Discord Trigger').item.json.username) + \"\\n**Original:** \" + ($json._originalContent || '') }}",
+        "labels": [
+          "type::bug"
+        ],
+        "assignee_ids": []
+      },
+      "type": "n8n-nodes-base.gitlab",
+      "typeVersion": 1,
+      "position": [
+        4060,
+        480
+      ],
+      "id": "e5f6a7b8-c9d0-1234-ef01-345678901235",
+      "name": "Create an issue (Bug)",
+      "credentials": {
+        "gitlabApi": {
+          "id": "KTCHMKP6R5WUZRae",
+          "name": "GitLab account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "guildId": {
+          "__rl": true,
+          "value": "1492092666945605662",
+          "mode": "list",
+          "cachedResultName": "CardYard",
+          "cachedResultUrl": "https://discord.com/channels/1492092666945605662"
+        },
+        "channelId": {
+          "__rl": true,
+          "value": "1492092922189971618",
+          "mode": "list",
+          "cachedResultName": "gitlab",
+          "cachedResultUrl": "https://discord.com/channels/1492092666945605662/1492092922189971618"
+        },
+        "content": "=✅ User Story erstellt: **{{ $json.title }}**\n{{ $json.web_url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        4260,
+        280
+      ],
+      "id": "4ca1bf2c-6c31-480a-9bda-816b833823fe",
+      "name": "Send a success message",
+      "webhookId": "06fc2030-854d-4f90-ab6b-81905d77482a",
+      "credentials": {
+        "discordBotApi": {
+          "id": "zDyZ6GajOJRXLGJv",
+          "name": "Discord Bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "guildId": {
+          "__rl": true,
+          "value": "1492092666945605662",
+          "mode": "list",
+          "cachedResultName": "CardYard",
+          "cachedResultUrl": "https://discord.com/channels/1492092666945605662"
+        },
+        "channelId": {
+          "__rl": true,
+          "value": "1492092922189971618",
+          "mode": "list",
+          "cachedResultName": "gitlab",
+          "cachedResultUrl": "https://discord.com/channels/1492092666945605662/1492092922189971618"
+        },
+        "content": "=🐛 Bug Report erstellt: **{{ $json.title }}**\n{{ $json.web_url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        4260,
+        480
+      ],
+      "id": "f6a7b8c9-d0e1-2345-f012-456789012346",
+      "name": "Send bug success message",
+      "webhookId": "06fc2030-854d-4f90-ab6b-81905d77482a",
+      "credentials": {
+        "discordBotApi": {
+          "id": "zDyZ6GajOJRXLGJv",
+          "name": "Discord Bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "guildId": {
+          "__rl": true,
+          "value": "1492092666945605662",
+          "mode": "list",
+          "cachedResultName": "CardYard",
+          "cachedResultUrl": "https://discord.com/channels/1492092666945605662"
+        },
+        "channelId": {
+          "__rl": true,
+          "value": "1492092922189971618",
+          "mode": "list",
+          "cachedResultName": "gitlab",
+          "cachedResultUrl": "https://discord.com/channels/1492092666945605662/1492092922189971618"
+        },
+        "content": "=❌ Fehler bei der Verarbeitung deiner Idee (Message ID: {{ $json._messageId }})\n{{ $json.error.message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        4260,
+        680
+      ],
+      "id": "9c103119-0b0c-4625-be87-0c60e260c66e",
+      "name": "Send error message",
+      "webhookId": "06fc2030-854d-4f90-ab6b-81905d77482a",
+      "credentials": {
+        "discordBotApi": {
+          "id": "zDyZ6GajOJRXLGJv",
+          "name": "Discord Bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "story",
+        "authentication": "basicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        280
+      ],
+      "id": "27531ee5-ea4b-416f-90bc-8f8a740b6737",
+      "name": "Webhook: Receive DC Message",
+      "webhookId": "72a53341-48b0-4ceb-95a4-5c7bf1355ede",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "M1g2uDGpun0rGTbn",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = ($json.text ?? '').trim();\nconst clean = raw.replace(/^```\\w*\\n?/, '').replace(/\\n?```$/, '').trim();\nconst parsed = JSON.parse(clean);\nreturn {\n  json: {\n    _parsedTitle: parsed.title ?? '',\n    _parsedDescription: parsed.description ?? '',\n    _imageSection: $json._imageSection ?? '',\n    _originalContent: $json._originalContent ?? '',\n    _messageId: $json._messageId ?? '',\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3860,
+        280
+      ],
+      "id": "aa000001-0000-4000-8000-000000000001",
+      "name": "Code: Parse story output",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = ($json.text ?? '').trim();\nconst clean = raw.replace(/^```\\w*\\n?/, '').replace(/\\n?```$/, '').trim();\nconst parsed = JSON.parse(clean);\nreturn {\n  json: {\n    _parsedTitle: parsed.title ?? '',\n    _parsedDescription: parsed.description ?? '',\n    _imageSection: $json._imageSection ?? '',\n    _originalContent: $json._originalContent ?? '',\n    _messageId: $json._messageId ?? '',\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3860,
+        480
+      ],
+      "id": "aa000002-0000-4000-8000-000000000002",
+      "name": "Code: Parse bug output",
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "connections": {
+    "Discord Trigger": {
+      "main": [
+        [
+          {
+            "node": "If 💡",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If 💡": {
+      "main": [
+        [
+          {
+            "node": "Load message content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If 🐛",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If 🐛": {
+      "main": [
+        [
+          {
+            "node": "Load message content (Bug)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load message content": {
+      "main": [
+        [
+          {
+            "node": "Set: story",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Load message content (Bug)": {
+      "main": [
+        [
+          {
+            "node": "Set: bug",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Set: story": {
+      "main": [
+        [
+          {
+            "node": "Code: Extract images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: bug": {
+      "main": [
+        [
+          {
+            "node": "Code: Extract images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Extract images": {
+      "main": [
+        [
+          {
+            "node": "IF: Has images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Has images": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Build enriched content (no images)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Set: Snapshot context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Snapshot context": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Download image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Download image": {
+      "main": [
+        [
+          {
+            "node": "Set: Re-attach after download",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Set: Re-attach after download": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Upload to GitLab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Upload to GitLab": {
+      "main": [
+        [
+          {
+            "node": "Set: Extract markdown",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Set: Extract markdown": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Code: Build enriched content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build enriched content": {
+      "main": [
+        [
+          {
+            "node": "IF: Route by type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build enriched content (no images)": {
+      "main": [
+        [
+          {
+            "node": "IF: Route by type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Route by type": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Basic LLM Chain (Bug)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model (Bug)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain (Bug)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code: Parse story output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send error message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Parse story output": {
+      "main": [
+        [
+          {
+            "node": "Create an issue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send error message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain (Bug)": {
+      "main": [
+        [
+          {
+            "node": "Code: Parse bug output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send error message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Parse bug output": {
+      "main": [
+        [
+          {
+            "node": "Create an issue (Bug)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send error message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an issue": {
+      "main": [
+        [
+          {
+            "node": "Send a success message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send error message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an issue (Bug)": {
+      "main": [
+        [
+          {
+            "node": "Send bug success message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send error message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: Receive DC Message": {
+      "main": [
+        [
+          {
+            "node": "If 💡",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "3b9f4521-c8d7-4e6a-b012-f3e45678901a",
+  "_meta": {
+    "globalHandlers": []
+  }
+}

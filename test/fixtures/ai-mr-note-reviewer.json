@@ -1,0 +1,421 @@
+{
+  "name": "AI MR-Note Reviewer",
+  "active": true,
+  "nodes": [
+    {
+      "id": "d1",
+      "name": "Webhook: GitLab MR Note",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        280
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gitlab-mr-note-intake",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "gitlab-mr-note-intake-v1"
+    },
+    {
+      "id": "d2",
+      "name": "Code: Validate + Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        280
+      ],
+      "parameters": {
+        "jsCode": "\nconst headers = $input.first().json.headers;\nconst body    = $input.first().json.body;\n\nconst secret = headers['x-gitlab-token'] ?? '';\nif (secret !== '1aa775b82eca4db73fb36a775f652c83459dd1d1dacb317641a9b1b5f3380b34') {\n  throw new Error('Invalid webhook secret');\n}\n\nif (body.object_kind !== 'note') {\n  return [{ json: { shouldProcess: false } }];\n}\n\nif (body.object_attributes?.noteable_type !== 'MergeRequest') {\n  return [{ json: { shouldProcess: false } }];\n}\n\nif (body.object_attributes?.system === true) {\n  return [{ json: { shouldProcess: false } }];\n}\n\n// Block bot user to prevent feedback loops\n// Replace BOT_USER_IDs with the actual GitLab user ID of the service account\nconst BOT_USER_IDS = [];\nif (BOT_USER_IDS.includes(body.object_attributes?.author_id)) {\n  return [{ json: { shouldProcess: false } }];\n}\n\n// Block agent's own reply comments (start with checkmark emoji)\nconst noteBody = body.object_attributes?.note ?? '';\nif (noteBody.startsWith('\\u2705')) {\n  return [{ json: { shouldProcess: false } }];\n}\n\nconst mrIid      = body.merge_request?.iid ?? body.object_attributes?.noteable_iid;\nconst mrBranch   = body.merge_request?.source_branch ?? '';\nconst issueIid   = body.merge_request?.description?.match(/#(\\d+)/)?.[1] ?? '';\nconst issueTitle = body.merge_request?.title ?? '';\nconst assignee   = body.merge_request?.assignee?.username\n                   ?? body.merge_request?.assignees?.[0]?.username\n                   ?? '';\n\nconst knownDevs = ['henry2k'];\nconst shouldProcess = knownDevs.includes(assignee);\n\nreturn [{\n  json: {\n    shouldProcess,\n    mrIid,\n    mrBranch,\n    issueIid,\n    issueTitle,\n    assignee,\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "d3",
+      "name": "IF: Should Process?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        280
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "d1",
+              "leftValue": "={{ $json.shouldProcess }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "d4",
+      "name": "Respond: Ignore",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        920,
+        480
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\":\"ignored\"}",
+        "options": {}
+      }
+    },
+    {
+      "id": "d5",
+      "name": "Code: Deduplicate + Queue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        280
+      ],
+      "parameters": {
+        "jsCode": "\nconst input = $input.first().json;\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.pendingJobs) staticData.pendingJobs = {};\n\nconst mrIid = input.mrIid;\n\n// Deduplicate: if a job already exists for this MR, skip\nconst existingJob = Object.values(staticData.pendingJobs).find(j => j.mrIid === mrIid);\nif (existingJob) {\n  return [{ json: { alreadyQueued: true, jobId: existingJob.jobId } }];\n}\n\nconst jobId = $execution.id;\nconst job = {\n  jobId,\n  mrIid,\n  mrBranch:   input.mrBranch,\n  issueIid:   input.issueIid,\n  issueTitle: input.issueTitle,\n  assignee:   input.assignee,\n  status:     'pending',\n  resumeUrl:  $execution.resumeUrl,\n  createdAt:  new Date().toISOString(),\n};\nstaticData.pendingJobs[jobId] = job;\n\nreturn [{ json: { alreadyQueued: false, jobId } }];\n"
+      }
+    },
+    {
+      "id": "d6",
+      "name": "IF: Already Queued?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        280
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "d2",
+              "leftValue": "={{ $json.alreadyQueued }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "d7",
+      "name": "Respond: Already Queued",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        280
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\":\"already queued\"}",
+        "options": {}
+      }
+    },
+    {
+      "id": "d8",
+      "name": "Respond: Acknowledge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        480
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\":\"queued\"}",
+        "options": {}
+      }
+    },
+    {
+      "id": "d9",
+      "name": "Wait: Resume Webhook",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1520,
+        480
+      ],
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "POST"
+      },
+      "webhookId": "ai-reviewer-wait-v1"
+    },
+    {
+      "id": "d10",
+      "name": "Code: Deregister Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1720,
+        480
+      ],
+      "parameters": {
+        "jsCode": "\nconst staticData = $getWorkflowStaticData('global');\nif (staticData.pendingJobs) {\n  delete staticData.pendingJobs[$execution.id];\n}\nreturn $input.all();\n"
+      }
+    },
+    {
+      "id": "d11",
+      "name": "Webhook: Pending Jobs",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        80
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "ai-reviewer-pending-jobs",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "ai-reviewer-pending-jobs-v1"
+    },
+    {
+      "id": "d12",
+      "name": "Code: List Pending Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        80
+      ],
+      "parameters": {
+        "jsCode": "\nconst dev = $input.first().json.query?.dev ?? '';\nconst staticData = $getWorkflowStaticData('global');\nconst allJobs = Object.values(staticData.pendingJobs ?? {});\nconst jobs = dev ? allJobs.filter(j => j.assignee === dev) : allJobs;\nreturn [{ json: { jobs } }];\n"
+      }
+    },
+    {
+      "id": "d13",
+      "name": "Respond: Pending Jobs",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        80
+      ],
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      }
+    },
+    {
+      "id": "d14",
+      "name": "Webhook: Remove Job",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        480
+      ],
+      "parameters": {
+        "httpMethod": "DELETE",
+        "path": "ai-reviewer-remove-job",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "ai-reviewer-remove-job-v1"
+    },
+    {
+      "id": "d15",
+      "name": "Code: Remove Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        480
+      ],
+      "parameters": {
+        "jsCode": "\nconst jobId = $input.first().json.query?.jobId ?? $input.first().json.body?.jobId ?? '';\nconst staticData = $getWorkflowStaticData('global');\nif (staticData.pendingJobs && jobId) {\n  delete staticData.pendingJobs[jobId];\n}\nreturn [{ json: { removed: true, jobId } }];\n"
+      }
+    },
+    {
+      "id": "d16",
+      "name": "Respond: Job Removed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        480
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'removed', jobId: $json.jobId }) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook: GitLab MR Note": {
+      "main": [
+        [
+          {
+            "node": "Code: Validate + Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Validate + Filter": {
+      "main": [
+        [
+          {
+            "node": "IF: Should Process?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Should Process?": {
+      "main": [
+        [
+          {
+            "node": "Code: Deduplicate + Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Ignore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Deduplicate + Queue": {
+      "main": [
+        [
+          {
+            "node": "IF: Already Queued?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Already Queued?": {
+      "main": [
+        [
+          {
+            "node": "Respond: Already Queued",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Acknowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond: Acknowledge": {
+      "main": [
+        [
+          {
+            "node": "Wait: Resume Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait: Resume Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code: Deregister Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: Pending Jobs": {
+      "main": [
+        [
+          {
+            "node": "Code: List Pending Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: List Pending Jobs": {
+      "main": [
+        [
+          {
+            "node": "Respond: Pending Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: Remove Job": {
+      "main": [
+        [
+          {
+            "node": "Code: Remove Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Remove Job": {
+      "main": [
+        [
+          {
+            "node": "Respond: Job Removed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "global": {
+      "pendingJobs": {}
+    }
+  },
+  "id": "9QSiDmqM2AfCPLBN",
+  "_meta": {
+    "globalHandlers": []
+  }
+}
