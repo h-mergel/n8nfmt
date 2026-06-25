@@ -37,6 +37,12 @@ describe("CLI file modes", () => {
     expect(r.status).toBe(1);
   });
 
+  it("exits 2 when both --write and --check are given", () => {
+    const r = run(["--write", "--check", tmpWorkflow()]);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/--write|--check/);
+  });
+
   it("--write rewrites the file, after which --check passes (idempotent)", () => {
     const file = tmpWorkflow();
     expect(run(["--write", file]).status).toBe(0);
