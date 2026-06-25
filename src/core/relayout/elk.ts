@@ -1,9 +1,23 @@
+import { createRequire } from "node:module";
 import type { ElkNode, ElkExtendedEdge } from 'elkjs';
 import type { N8nNode, Edge, LayoutPos } from '../types.js';
 import { nodeDimensions, STICKY_DEFAULT_WIDTH, STICKY_DEFAULT_HEIGHT } from './nodes.js';
 
 export interface ElkLayouter {
   layout(graph: ElkNode): Promise<ElkNode>;
+}
+
+const requireCjs = createRequire(import.meta.url);
+const ElkConstructor = requireCjs("elkjs/lib/elk.bundled.js") as { new (): ElkLayouter };
+
+/**
+ * Instantiate the ELK engine. elkjs is a CommonJS bundle; `createRequire` is the
+ * ESM-interop load under `verbatimModuleSyntax` + NodeNext. It is a pure in-process
+ * module load (no I/O), so it does not violate the "core is silent" constraint.
+ * Loaded once at module init, not per call.
+ */
+export function createElkInstance(): ElkLayouter {
+  return new ElkConstructor();
 }
 
 // ---------------------------------------------------------------------------

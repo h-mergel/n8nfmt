@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import { buildLayoutConfig } from "../config.js";
 import type {
   N8nWorkflow,
@@ -6,9 +5,8 @@ import type {
   RelayoutResult,
   RelayoutReport,
 } from "../types.js";
-import type { ElkLayouter } from "./elk.js";
 import { buildWorkflowGraph } from "./graph.js";
-import { runElkLayout } from "./elk.js";
+import { runElkLayout, createElkInstance } from "./elk.js";
 import { computeStickyGroups, analyzeWorkflow } from "./analysis.js";
 import {
   placeSections,
@@ -51,10 +49,7 @@ export async function relayout(
   if (layoutNodes.length === 0) return { workflow: wf, report };
   report.cyclicEdges = cyclicEdges;
 
-  const _require = createRequire(import.meta.url);
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-require-imports
-  const ELKCtor = _require("elkjs/lib/elk.bundled.js") as { new(): ElkLayouter };
-  const elk = new ELKCtor();
+  const elk = createElkInstance();
   const elkPositions = await runElkLayout(
     elk,
     layoutNodes,
@@ -66,6 +61,8 @@ export async function relayout(
   );
 
   const analysis = analyzeWorkflow(wf, graph, stickyGroups);
+  // `globalHandlerNames` (string set) is intentionally not destructured — the engine uses
+  // the `globalHandlers` node array directly to populate `report.globalHandlers`.
   const { sections, bodyNodes, crossIndentedSections, bypassNodeNames, orphans, globalHandlers } =
     analysis;
 
