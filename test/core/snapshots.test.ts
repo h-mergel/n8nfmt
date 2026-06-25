@@ -18,6 +18,9 @@ function positions(wf: N8nWorkflow) {
 const files = readdirSync(fixturesDir).filter((f) => f.endsWith(".json"));
 
 describe("golden snapshots", () => {
+  it("loaded the migrated fixtures (guards against an empty/missing fixtures dir)", () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
   it.each(files)("relayout(%s) matches its golden positions", async (file) => {
     const input = JSON.parse(readFileSync(join(fixturesDir, file), "utf8")) as N8nWorkflow;
     const golden = JSON.parse(readFileSync(join(snapshotsDir, file), "utf8")) as N8nWorkflow;
