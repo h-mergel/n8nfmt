@@ -1,0 +1,41 @@
+{
+  "name": "n8nfmt",
+  "version": "0.1.0",
+  "description": "Opinionated auto-layout formatter for n8n workflow JSON. Not affiliated with n8n.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Heinrich Mergel",
+  "keywords": ["n8n", "workflow", "layout", "formatter", "elk"],
+  "engines": { "node": ">=22" },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    }
+  },
+  "bin": { "n8nfmt": "./dist/cli/index.js" },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "optimize": "tsx tools/optimize/index.ts"
+  },
+  "dependencies": {
+    "elkjs": "^0.11.1",
+    "tinyglobby": "^0.2.10"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@changesets/cli": "^2.27.10",
+    "@types/node": "^22.0.0",
+    "fast-check": "^3.23.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
