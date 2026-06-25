@@ -15,10 +15,10 @@ function positions(wf: N8nWorkflow) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-const files = readdirSync(fixturesDir).filter((f) => f.endsWith(".json"));
+const files = readdirSync(snapshotsDir).filter((f) => f.endsWith(".json"));
 
 describe("golden snapshots", () => {
-  it("loaded the migrated fixtures (guards against an empty/missing fixtures dir)", () => {
+  it("loaded the goldens (guards against an empty/missing snapshots dir)", () => {
     expect(files.length).toBeGreaterThan(0);
   });
   it.each(files)("relayout(%s) matches its golden positions", async (file) => {
