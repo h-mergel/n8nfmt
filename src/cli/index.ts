@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
+import { glob } from "tinyglobby";
 import { relayout, serialize } from "../core/index.js";
 import type { N8nWorkflow } from "../core/index.js";
 import { resolveOptions } from "./config.js";
@@ -77,14 +78,53 @@ export async function main(argv: string[]): Promise<number> {
   return await runFileMode(values, positionals, options);
 }
 
-// Placeholder wired up in Task 12.
 async function runFileMode(
-  _values: Record<string, unknown>,
-  _paths: string[],
-  _options: Awaited<ReturnType<typeof resolveOptions>>,
+  values: { write?: boolean; check?: boolean; verbose?: boolean },
+  paths: string[],
+  options: Awaited<ReturnType<typeof resolveOptions>>,
 ): Promise<number> {
-  process.stderr.write("n8nfmt: file mode not yet implemented\n");
-  return 2;
+  if (values.write === values.check) {
+    // neither or both
+    process.stderr.write("n8nfmt: with file paths, pass exactly one of --write or --check\n");
+    return 2;
+  }
+
+  // Normalize `\` → `/`: tinyglobby treats backslashes as escapes, and on Windows
+  // both argv paths and temp paths arrive with backslashes.
+  const patterns = paths.map((p) => p.replace(/\\/g, "/"));
+  const files = await glob(patterns, { absolute: true, onlyFiles: true });
+  if (files.length === 0) {
+    process.stderr.write("n8nfmt: no files matched\n");
+    return 2;
+  }
+
+  let changed = 0;
+  let failed = 0;
+  for (const file of files) {
+    try {
+      const original = await readFile(file, "utf8");
+      const { workflow } = await relayout(JSON.parse(original) as N8nWorkflow, options);
+      const canonical = serialize(workflow);
+      if (canonical === original) continue;
+      changed++;
+      if (values.check) {
+        if (values.verbose) process.stderr.write(`would reformat: ${file}\n`);
+      } else {
+        await writeFile(file, canonical, "utf8");
+        if (values.verbose) process.stderr.write(`reformatted: ${file}\n`);
+      }
+    } catch (e) {
+      failed++;
+      process.stderr.write(`n8nfmt: ${file}: ${(e as Error).message}\n`);
+    }
+  }
+
+  if (values.verbose) {
+    process.stderr.write(`n8nfmt: ${files.length} file(s), ${changed} changed, ${failed} failed\n`);
+  }
+  if (failed > 0) return 2;
+  if (values.check && changed > 0) return 1;
+  return 0;
 }
 
 main(process.argv.slice(2))
