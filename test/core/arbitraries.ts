@@ -21,9 +21,7 @@ export const arbWorkflow: fc.Arbitrary<N8nWorkflow> = fc
 
     return fc
       .array(
-        fc
-          .tuple(fc.constantFrom(...names), fc.constantFrom(...names))
-          .filter(([a, b]) => a !== b),
+        fc.tuple(fc.constantFrom(...names), fc.constantFrom(...names)).filter(([a, b]) => a !== b),
         { maxLength: 12 },
       )
       .map((pairs) => {

@@ -3,39 +3,39 @@
 // ---------------------------------------------------------------------------
 
 export interface N8nNodeParameters {
-  width?:  number;
+  width?: number;
   height?: number;
   [key: string]: unknown;
 }
 
 export interface N8nNode {
-  name:        string;
-  type:        string;
-  position:    [number, number];
+  name: string;
+  type: string;
+  position: [number, number];
   parameters?: N8nNodeParameters;
 }
 
 export interface N8nConnection {
-  node:   string;
-  type?:  string;
+  node: string;
+  type?: string;
   index?: number;
 }
 
-export type N8nBranch      = Array<N8nConnection | null> | null;
-export type N8nChannels    = Record<string, N8nBranch[]>;
+export type N8nBranch = Array<N8nConnection | null> | null;
+export type N8nChannels = Record<string, N8nBranch[]>;
 export type N8nConnections = Record<string, N8nChannels>;
 
 export interface N8nWorkflow {
-  nodes:       N8nNode[];
+  nodes: N8nNode[];
   connections: N8nConnections;
-  _meta?:      { bypassNodes?: string[]; globalHandlers?: string[] };
+  _meta?: { bypassNodes?: string[]; globalHandlers?: string[] };
 }
 
 // ---------------------------------------------------------------------------
 // Internal layout types
 // ---------------------------------------------------------------------------
 
-export type Edge         = [string, string];
+export type Edge = [string, string];
 export type BranchedEdge = [string, string, number];
 
 export interface LayoutPos {
@@ -49,7 +49,7 @@ export interface GridEntry {
 }
 
 export interface Section {
-  sticky:  N8nNode;
+  sticky: N8nNode;
   members: N8nNode[];
 }
 

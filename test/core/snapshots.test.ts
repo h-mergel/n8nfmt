@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { relayout } from "../../src/core/index.js";
 import type { N8nWorkflow } from "../../src/core/types.js";

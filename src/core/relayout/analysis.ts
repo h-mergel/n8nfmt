@@ -2,21 +2,15 @@
 // analysis.ts — Workflow structural analysis (sections, error handlers, body nodes)
 // ---------------------------------------------------------------------------
 
+import type { Edge, N8nConnections, N8nNode, N8nWorkflow, Section } from "../types.js";
+import type { WorkflowGraph } from "./graph.js";
 import {
-  isSticky,
   DEFAULT_HEIGHT,
-  STICKY_DEFAULT_WIDTH,
   STICKY_DEFAULT_HEIGHT,
+  STICKY_DEFAULT_WIDTH,
+  isSticky,
   nodeWidth,
-} from './nodes.js';
-import type {
-  N8nNode,
-  N8nConnections,
-  N8nWorkflow,
-  Edge,
-  Section,
-} from '../types.js';
-import type { WorkflowGraph } from './graph.js';
+} from "./nodes.js";
 
 // ---------------------------------------------------------------------------
 // WorkflowAnalysis — aggregated structural analysis result
@@ -24,19 +18,19 @@ import type { WorkflowGraph } from './graph.js';
 
 export interface WorkflowAnalysis {
   /** Sticky-note sections with their member nodes (global handlers removed) */
-  sections:              Section[];
+  sections: Section[];
   /** Names of nodes acting as global error handlers (span ≥2 sections) */
-  globalHandlerNames:    Set<string>;
+  globalHandlerNames: Set<string>;
   /** Body nodes of SplitInBatches loops (placed at row≥1) */
-  bodyNodes:             Set<string>;
+  bodyNodes: Set<string>;
   /** Section indices that are crossed by a cross-section edge (R10 indent) */
   crossIndentedSections: Set<number>;
   /** Orphan node names that are targets of cross-section backward edges (R12) */
-  bypassNodeNames:       Set<string>;
+  bypassNodeNames: Set<string>;
   /** Layout nodes not assigned to any sticky section */
-  orphans:               N8nNode[];
+  orphans: N8nNode[];
   /** Layout nodes that are global error handlers */
-  globalHandlers:        N8nNode[];
+  globalHandlers: N8nNode[];
 }
 
 // ---------------------------------------------------------------------------
@@ -49,13 +43,13 @@ export interface WorkflowAnalysis {
  */
 export function computeStickyGroups(nodes: N8nNode[]): Map<string, Set<string>> {
   const stickies = nodes.filter(isSticky);
-  const regular  = nodes.filter(n => !isSticky(n));
-  const groups   = new Map<string, Set<string>>();
+  const regular = nodes.filter((n) => !isSticky(n));
+  const groups = new Map<string, Set<string>>();
 
   for (const s of stickies) {
     const sx = s.position[0];
     const sy = s.position[1];
-    const sw = s.parameters?.width  ?? STICKY_DEFAULT_WIDTH;
+    const sw = s.parameters?.width ?? STICKY_DEFAULT_WIDTH;
     const sh = s.parameters?.height ?? STICKY_DEFAULT_HEIGHT;
 
     const members = new Set<string>();
@@ -84,14 +78,14 @@ export function computeStickyGroups(nodes: N8nNode[]): Map<string, Set<string>> 
  */
 export function detectGlobalErrorHandlers(
   connections: N8nConnections | undefined,
-  sections:    Section[],
+  sections: Section[],
 ): Set<string> {
   const errorSources = new Map<string, string[]>();
   for (const [sourceName, channels] of Object.entries(connections ?? {})) {
     for (const [channelName, branches] of Object.entries(channels)) {
-      if (channelName === 'main' || channelName.startsWith('ai_')) continue;
-      for (const branch of (branches ?? [])) {
-        for (const conn of (branch ?? [])) {
+      if (channelName === "main" || channelName.startsWith("ai_")) continue;
+      for (const branch of branches ?? []) {
+        for (const conn of branch ?? []) {
           if (conn?.node) {
             const list = errorSources.get(conn.node) ?? [];
             list.push(sourceName);
@@ -114,9 +108,7 @@ export function detectGlobalErrorHandlers(
   const globalHandlers = new Set<string>();
   for (const [target, sources] of errorSources.entries()) {
     const sectionSet = new Set(
-      sources
-        .map(s => nodeToSection.get(s))
-        .filter((s): s is number => s !== undefined),
+      sources.map((s) => nodeToSection.get(s)).filter((s): s is number => s !== undefined),
     );
     if (sectionSet.size >= 2) globalHandlers.add(target);
   }
@@ -142,20 +134,20 @@ export function findBodyNodes(wf: N8nWorkflow, sections: Section[]): Set<string>
   const allBodyNodes = new Set<string>();
 
   // All layout node names across all sections (for BFS boundary)
-  const allSectionNodeNames = new Set(sections.flatMap(s => s.members.map(n => n.name)));
+  const allSectionNodeNames = new Set(sections.flatMap((s) => s.members.map((n) => n.name)));
 
   for (const { members } of sections) {
     // Find SplitInBatches loop nodes in this section
-    const loopNodes = members.filter(n => n.type === 'n8n-nodes-base.splitInBatches');
+    const loopNodes = members.filter((n) => n.type === "n8n-nodes-base.splitInBatches");
     if (loopNodes.length === 0) continue;
 
     for (const loopNode of loopNodes) {
       // splitInBatches port mapping:
       //   port-0 (mainBranches[0]) = "done"   — exit path after all items processed
       //   port-1 (mainBranches[1]) = "loop body" — executed for each item
-      const mainBranches = wf.connections[loopNode.name]?.['main'] ?? [];
+      const mainBranches = wf.connections[loopNode.name]?.main ?? [];
       const bodyTargets = (mainBranches[1] ?? [])
-        .map(c => c?.node)
+        .map((c) => c?.node)
         .filter((n): n is string => !!n && n !== loopNode.name);
 
       if (bodyTargets.length === 0) continue;
@@ -167,20 +159,16 @@ export function findBodyNodes(wf: N8nWorkflow, sections: Section[]): Set<string>
       // when it is a section node; we still traverse non-section nodes freely.
       // Stop when the loop node itself is reached (back edge).
       const visited = new Set<string>(bodyTargets);
-      const queue   = [...bodyTargets];
+      const queue = [...bodyTargets];
 
       while (queue.length > 0) {
         const cur = queue.shift()!;
         if (allSectionNodeNames.has(cur)) allBodyNodes.add(cur);
 
-        const mainOut = wf.connections[cur]?.['main'] ?? [];
+        const mainOut = wf.connections[cur]?.main ?? [];
         for (const branch of mainOut) {
-          for (const conn of (branch ?? [])) {
-            if (
-              conn?.node &&
-              !visited.has(conn.node) &&
-              conn.node !== loopNode.name
-            ) {
+          for (const conn of branch ?? []) {
+            if (conn?.node && !visited.has(conn.node) && conn.node !== loopNode.name) {
               visited.add(conn.node);
               queue.push(conn.node);
             }
@@ -204,8 +192,8 @@ export function findBodyNodes(wf: N8nWorkflow, sections: Section[]): Set<string>
  * but before ELK layout positions are needed.
  */
 export function analyzeWorkflow(
-  wf:          N8nWorkflow,
-  graph:       WorkflowGraph,
+  wf: N8nWorkflow,
+  graph: WorkflowGraph,
   stickyGroups: Map<string, Set<string>>,
 ): WorkflowAnalysis {
   const { layoutNodes, safeEdges, cyclicEdges } = graph;
@@ -213,27 +201,31 @@ export function analyzeWorkflow(
   // Sort stickies by original position (X primary, Y tiebreaker)
   const stickies = wf.nodes
     .filter(isSticky)
-    .sort((a, b) => a.position[0] !== b.position[0]
-      ? a.position[0] - b.position[0]
-      : a.position[1] - b.position[1]);
+    .sort((a, b) =>
+      a.position[0] !== b.position[0]
+        ? a.position[0] - b.position[0]
+        : a.position[1] - b.position[1],
+    );
 
   // Build section list: [{sticky, members}]
-  const sections: Section[] = stickies.map(sticky => {
+  const sections: Section[] = stickies.map((sticky) => {
     const memberSet = stickyGroups.get(sticky.name) ?? new Set<string>();
-    const members   = layoutNodes.filter(n => memberSet.has(n.name));
+    const members = layoutNodes.filter((n) => memberSet.has(n.name));
     return { sticky, members };
   });
 
   // R11: detect global error handlers (sources span ≥2 sections) before grids are computed
   const globalHandlerNames = detectGlobalErrorHandlers(wf.connections, sections);
   for (const section of sections) {
-    section.members = section.members.filter(n => !globalHandlerNames.has(n.name));
+    section.members = section.members.filter((n) => !globalHandlerNames.has(n.name));
   }
 
   // Orphan nodes: layout nodes not assigned to any sticky section
-  const allSectionNodeNames = new Set(sections.flatMap(s => s.members.map(n => n.name)));
-  const orphans        = layoutNodes.filter(n => !allSectionNodeNames.has(n.name) && !globalHandlerNames.has(n.name));
-  const globalHandlers = layoutNodes.filter(n => globalHandlerNames.has(n.name));
+  const allSectionNodeNames = new Set(sections.flatMap((s) => s.members.map((n) => n.name)));
+  const orphans = layoutNodes.filter(
+    (n) => !allSectionNodeNames.has(n.name) && !globalHandlerNames.has(n.name),
+  );
+  const globalHandlers = layoutNodes.filter((n) => globalHandlerNames.has(n.name));
 
   // Loop body nodes (R3/R5)
   const bodyNodes = findBodyNodes(wf, sections);
@@ -248,7 +240,7 @@ export function analyzeWorkflow(
   const crossIndentedSections = new Set<number>();
   for (const [from, to] of [...safeEdges, ...cyclicEdges]) {
     const secFrom = nodeToSection.get(from);
-    const secTo   = nodeToSection.get(to);
+    const secTo = nodeToSection.get(to);
     if (secFrom === undefined || secTo === undefined || secFrom === secTo) continue;
     const lo = Math.min(secFrom, secTo);
     const hi = Math.max(secFrom, secTo);
@@ -262,12 +254,12 @@ export function analyzeWorkflow(
   const sectionOrMax = (name: string): number | undefined => {
     const s = nodeToSection.get(name);
     if (s !== undefined) return s;
-    if (orphans.some(n => n.name === name)) return sections.length;
+    if (orphans.some((n) => n.name === name)) return sections.length;
     return undefined;
   };
   for (const [from, to] of [...safeEdges, ...cyclicEdges]) {
     const secFrom = sectionOrMax(from);
-    const secTo   = sectionOrMax(to);
+    const secTo = sectionOrMax(to);
     if (secFrom === undefined || secTo === undefined) continue;
     if (secFrom <= secTo) continue;
     if (nodeToSection.has(to)) continue;

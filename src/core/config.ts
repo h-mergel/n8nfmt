@@ -4,28 +4,28 @@
 
 export interface LayoutConfig {
   /** Grid snap size in px (R2). n8n canvas snaps to this value. */
-  grid:             number;
+  grid: number;
   /** Vertical step between rows within a section (R8). */
-  rowStep:          number;
+  rowStep: number;
   /** Y offset of the routing-lane row 0 inside a sticky note (R8). */
-  topPad:           number;
+  topPad: number;
   /** Distance from sticky left edge to first column of nodes (R7). */
-  leftIndent:       number;
+  leftIndent: number;
   /** Minimum horizontal gap between node right edge and next node left edge (R7). */
-  minGap:           number;
+  minGap: number;
   /** Gap between sticky right edge and the next sticky left edge (R8). */
-  sectionGap:       number;
+  sectionGap: number;
   /** Minimum column-distance for an edge to be considered a "skip" (R12/R13). */
   skipColThreshold: number;
 }
 
 export const DEFAULT_CONFIG: LayoutConfig = {
-  grid:             20,
-  rowStep:          200,
-  topPad:           80,
-  leftIndent:       120,
-  minGap:           100,
-  sectionGap:       80,
+  grid: 20,
+  rowStep: 200,
+  topPad: 80,
+  leftIndent: 120,
+  minGap: 100,
+  sectionGap: 80,
   skipColThreshold: 3,
 };
 

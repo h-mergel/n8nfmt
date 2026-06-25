@@ -1,19 +1,14 @@
 import { buildLayoutConfig } from "../config.js";
-import type {
-  N8nWorkflow,
-  RelayoutOptions,
-  RelayoutResult,
-  RelayoutReport,
-} from "../types.js";
+import type { N8nWorkflow, RelayoutOptions, RelayoutReport, RelayoutResult } from "../types.js";
+import { analyzeWorkflow, computeStickyGroups } from "./analysis.js";
+import { createElkInstance, runElkLayout } from "./elk.js";
 import { buildWorkflowGraph } from "./graph.js";
-import { runElkLayout, createElkInstance } from "./elk.js";
-import { computeStickyGroups, analyzeWorkflow } from "./analysis.js";
 import {
-  placeSections,
-  placeOrphans,
-  placeGlobalHandlers,
-  placeAiSubNodes,
   applyPlacementPlan,
+  placeAiSubNodes,
+  placeGlobalHandlers,
+  placeOrphans,
+  placeSections,
 } from "./placement.js";
 import type { PlacementPlan } from "./placement.js";
 

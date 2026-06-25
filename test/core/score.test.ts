@@ -1,17 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { score } from "../../src/core/score/index.js";
 import { relayout } from "../../src/core/index.js";
+import { score } from "../../src/core/score/index.js";
 import type { N8nWorkflow } from "../../src/core/types.js";
 
 const sticky = (name: string, x: number, y: number, w = 600, h = 400) => ({
-  name, type: "n8n-nodes-base.stickyNote", position: [x, y] as [number, number],
+  name,
+  type: "n8n-nodes-base.stickyNote",
+  position: [x, y] as [number, number],
   parameters: { width: w, height: h },
 });
 const node = (name: string, x: number, y: number) => ({
-  name, type: "n8n-nodes-base.set", position: [x, y] as [number, number],
+  name,
+  type: "n8n-nodes-base.set",
+  position: [x, y] as [number, number],
 });
 const wf = (nodes: object[], connections: object = {}): N8nWorkflow =>
-  ({ nodes, connections } as N8nWorkflow);
+  ({ nodes, connections }) as N8nWorkflow;
 
 describe("score", () => {
   it("detects overlapping nodes", () => {
@@ -25,8 +29,12 @@ describe("score", () => {
   });
 
   it("clean layout scores better than overlapping", () => {
-    const clean = score(wf([sticky("S", 0, 0, 800, 400), node("A", 100, 100), node("B", 400, 100)]));
-    const overlap = score(wf([sticky("S", 0, 0, 800, 400), node("A", 100, 100), node("B", 100, 100)]));
+    const clean = score(
+      wf([sticky("S", 0, 0, 800, 400), node("A", 100, 100), node("B", 400, 100)]),
+    );
+    const overlap = score(
+      wf([sticky("S", 0, 0, 800, 400), node("A", 100, 100), node("B", 100, 100)]),
+    );
     expect(clean.rawScore).toBeGreaterThan(overlap.rawScore);
   });
 

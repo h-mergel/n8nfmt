@@ -2,13 +2,8 @@
 // graph.ts — Edge extraction and workflow graph construction
 // ---------------------------------------------------------------------------
 
-import { isSticky } from './nodes.js';
-import type {
-  N8nNode,
-  N8nConnections,
-  N8nWorkflow,
-  Edge,
-} from '../types.js';
+import type { Edge, N8nConnections, N8nNode, N8nWorkflow } from "../types.js";
+import { isSticky } from "./nodes.js";
 
 // ---------------------------------------------------------------------------
 // WorkflowGraph — aggregated graph data for the relayout pipeline
@@ -16,23 +11,23 @@ import type {
 
 export interface WorkflowGraph {
   /** Regular nodes for dagre/ELK (no stickies, no AI sub-nodes) */
-  layoutNodes:       N8nNode[];
+  layoutNodes: N8nNode[];
   /** Sticky note nodes */
-  stickyNodes:       N8nNode[];
+  stickyNodes: N8nNode[];
   /** AI sub-node → parent name (from ai_* channel connections) */
-  aiChildToParent:   Map<string, string>;
+  aiChildToParent: Map<string, string>;
   /** Set of AI sub-node names */
-  aiChildren:        Set<string>;
+  aiChildren: Set<string>;
   /** Main-channel edges with AI children filtered out */
-  mainEdges:         Edge[];
+  mainEdges: Edge[];
   /** Non-main, non-ai_* edges with AI children filtered out */
-  auxEdges:          Edge[];
+  auxEdges: Edge[];
   /** Synthetic bridge edges bypassing excluded AI nodes */
-  bridgeEdges:       Edge[];
+  bridgeEdges: Edge[];
   /** Acyclic (forward) edges from cycle detection */
-  safeEdges:         Edge[];
+  safeEdges: Edge[];
   /** Back-edges (cycle-closing) from cycle detection */
-  cyclicEdges:       Edge[];
+  cyclicEdges: Edge[];
   /** "from→to" → branch index (0-based port index from wf.connections) */
   branchIndexByEdge: Map<string, number>;
 }
@@ -48,9 +43,9 @@ export interface WorkflowGraph {
 export function extractEdges(connections: N8nConnections | undefined): Edge[] {
   const edges: Edge[] = [];
   for (const [sourceName, channels] of Object.entries(connections ?? {})) {
-    const mainBranches = channels['main'] ?? [];
+    const mainBranches = channels.main ?? [];
     for (const branch of mainBranches) {
-      for (const conn of (branch ?? [])) {
+      for (const conn of branch ?? []) {
         if (conn?.node && conn.node !== sourceName) {
           edges.push([sourceName, conn.node]);
         }
@@ -70,9 +65,9 @@ export function extractAISubNodes(connections: N8nConnections | undefined): Map<
   const childToParent = new Map<string, string>();
   for (const [sourceName, channels] of Object.entries(connections ?? {})) {
     for (const [channelName, branches] of Object.entries(channels)) {
-      if (!channelName.startsWith('ai_')) continue;
-      for (const branch of (branches ?? [])) {
-        for (const conn of (branch ?? [])) {
+      if (!channelName.startsWith("ai_")) continue;
+      for (const branch of branches ?? []) {
+        for (const conn of branch ?? []) {
           if (conn?.node) {
             childToParent.set(sourceName, conn.node);
           }
@@ -95,12 +90,12 @@ export function extractAISubNodes(connections: N8nConnections | undefined): Map<
  * following chains of consecutive AI nodes transitively.
  */
 export function extractAIBridgeEdges(
-  allEdges:        Edge[],
-  aiChildren:      Set<string>,
+  allEdges: Edge[],
+  aiChildren: Set<string>,
   aiChildToParent: Map<string, string>,
 ): Edge[] {
   const succs = new Map<string, string[]>();
-  const preds  = new Map<string, string[]>();
+  const preds = new Map<string, string[]>();
   for (const [from, to] of allEdges) {
     if (!succs.has(from)) succs.set(from, []);
     succs.get(from)!.push(to);
@@ -111,7 +106,7 @@ export function extractAIBridgeEdges(
   function nonAIPreds(node: string, visited = new Set<string>()): string[] {
     visited.add(node);
     const result: string[] = [];
-    for (const p of (preds.get(node) ?? [])) {
+    for (const p of preds.get(node) ?? []) {
       if (visited.has(p)) continue;
       if (!aiChildren.has(p)) result.push(p);
       else result.push(...nonAIPreds(p, visited));
@@ -122,7 +117,7 @@ export function extractAIBridgeEdges(
   function nonAISuccs(node: string, visited = new Set<string>()): string[] {
     visited.add(node);
     const result: string[] = [];
-    for (const s of (succs.get(node) ?? [])) {
+    for (const s of succs.get(node) ?? []) {
       if (visited.has(s)) continue;
       if (!aiChildren.has(s)) result.push(s);
       else result.push(...nonAISuccs(s, visited));
@@ -139,11 +134,20 @@ export function extractAIBridgeEdges(
         if (parent) {
           const k1 = `${p}→${parent}`;
           const k2 = `${parent}→${s}`;
-          if (!seen.has(k1)) { seen.add(k1); bridges.push([p, parent]); }
-          if (!seen.has(k2)) { seen.add(k2); bridges.push([parent, s]); }
+          if (!seen.has(k1)) {
+            seen.add(k1);
+            bridges.push([p, parent]);
+          }
+          if (!seen.has(k2)) {
+            seen.add(k2);
+            bridges.push([parent, s]);
+          }
         } else {
           const key = `${p}→${s}`;
-          if (!seen.has(key)) { seen.add(key); bridges.push([p, s]); }
+          if (!seen.has(key)) {
+            seen.add(key);
+            bridges.push([p, s]);
+          }
         }
       }
     }
@@ -155,10 +159,10 @@ export function extractAuxEdges(connections: N8nConnections | undefined): Edge[]
   const edges: Edge[] = [];
   for (const [sourceName, channels] of Object.entries(connections ?? {})) {
     for (const [channelName, branches] of Object.entries(channels)) {
-      if (channelName === 'main') continue;
-      if (channelName.startsWith('ai_')) continue;
-      for (const branch of (branches ?? [])) {
-        for (const conn of (branch ?? [])) {
+      if (channelName === "main") continue;
+      if (channelName.startsWith("ai_")) continue;
+      for (const branch of branches ?? []) {
+        for (const conn of branch ?? []) {
           if (conn?.node && conn.node !== sourceName) {
             edges.push([sourceName, conn.node]);
           }
@@ -194,27 +198,32 @@ export function extractAuxEdges(connections: N8nConnections | undefined): Edge[]
  */
 export function findCyclicEdges(
   nodeNames: string[],
-  edges:     Edge[],
+  edges: Edge[],
 ): { safe: Edge[]; cyclic: Edge[] } {
   const seenKeys = new Set<string>();
   const deduped: Edge[] = [];
   for (const e of edges) {
     const key = `${e[0]}→${e[1]}`;
-    if (!seenKeys.has(key)) { seenKeys.add(key); deduped.push(e); }
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      deduped.push(e);
+    }
   }
 
-  const adjacency = new Map<string, string[]>(nodeNames.map(n => [n, []]));
+  const adjacency = new Map<string, string[]>(nodeNames.map((n) => [n, []]));
   for (const [from, to] of deduped) {
     adjacency.get(from)?.push(to);
   }
 
-  const WHITE = 0, GRAY = 1, BLACK = 2;
-  const color      = new Map<string, number>(nodeNames.map(n => [n, WHITE]));
+  const WHITE = 0;
+  const GRAY = 1;
+  const BLACK = 2;
+  const color = new Map<string, number>(nodeNames.map((n) => [n, WHITE]));
   const cyclicKeys = new Set<string>();
 
   function dfs(u: string): void {
     color.set(u, GRAY);
-    for (const v of (adjacency.get(u) ?? [])) {
+    for (const v of adjacency.get(u) ?? []) {
       const vc = color.get(v);
       if (vc === undefined) continue;
       if (vc === GRAY) {
@@ -231,7 +240,7 @@ export function findCyclicEdges(
   }
 
   const cyclic: Edge[] = [];
-  const safe:   Edge[] = [];
+  const safe: Edge[] = [];
   for (const e of deduped) {
     if (cyclicKeys.has(`${e[0]}→${e[1]}`)) cyclic.push(e);
     else safe.push(e);
@@ -251,31 +260,34 @@ export function findCyclicEdges(
 export function buildWorkflowGraph(wf: N8nWorkflow): WorkflowGraph {
   // R3: identify AI sub-nodes — exclude from dagre, place after layout
   const aiChildToParent = extractAISubNodes(wf.connections);
-  const aiChildren      = new Set(aiChildToParent.keys());
+  const aiChildren = new Set(aiChildToParent.keys());
 
   // Regular nodes for dagre (no stickies, no AI sub-nodes)
-  const layoutNodes = wf.nodes.filter(n => !isSticky(n) && !aiChildren.has(n.name));
+  const layoutNodes = wf.nodes.filter((n) => !isSticky(n) && !aiChildren.has(n.name));
   const stickyNodes = wf.nodes.filter(isSticky);
-  const nodeNames   = layoutNodes.map(n => n.name);
+  const nodeNames = layoutNodes.map((n) => n.name);
 
   // Edge extraction and classification
-  const allEdges    = extractEdges(wf.connections);
-  const mainEdges   = allEdges.filter(([f, t]) => !aiChildren.has(f) && !aiChildren.has(t));
+  const allEdges = extractEdges(wf.connections);
+  const mainEdges = allEdges.filter(([f, t]) => !aiChildren.has(f) && !aiChildren.has(t));
   const bridgeEdges = extractAIBridgeEdges(allEdges, aiChildren, aiChildToParent);
-  const auxEdges    = extractAuxEdges(wf.connections).filter(([f, t]) => !aiChildren.has(f) && !aiChildren.has(t));
+  const auxEdges = extractAuxEdges(wf.connections).filter(
+    ([f, t]) => !aiChildren.has(f) && !aiChildren.has(t),
+  );
 
   // Cycle detection over combined edge set
-  const { safe: safeEdges, cyclic: cyclicEdges } = findCyclicEdges(
-    nodeNames,
-    [...mainEdges, ...bridgeEdges, ...auxEdges],
-  );
+  const { safe: safeEdges, cyclic: cyclicEdges } = findCyclicEdges(nodeNames, [
+    ...mainEdges,
+    ...bridgeEdges,
+    ...auxEdges,
+  ]);
 
   // Branch index map: "from→to" → 0-based port index from wf.connections
   const branchIndexByEdge = new Map<string, number>();
   for (const [sourceName, channels] of Object.entries(wf.connections ?? {})) {
-    const mainBranches = channels['main'] ?? [];
+    const mainBranches = channels.main ?? [];
     for (let bi = 0; bi < mainBranches.length; bi++) {
-      for (const conn of (mainBranches[bi] ?? [])) {
+      for (const conn of mainBranches[bi] ?? []) {
         if (conn?.node && conn.node !== sourceName) {
           const key = `${sourceName}→${conn.node}`;
           if (!branchIndexByEdge.has(key)) branchIndexByEdge.set(key, bi);

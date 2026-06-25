@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { relayout, serialize } from "../../src/core/index.js";
 import type { N8nWorkflow } from "../../src/core/types.js";
@@ -34,7 +34,10 @@ describe("invariants", () => {
     const input = load(file);
     const { workflow } = await relayout(input);
     const sig = (wf: N8nWorkflow) =>
-      wf.nodes.map((n) => `${n.name}:${n.type}`).sort().join("|");
+      wf.nodes
+        .map((n) => `${n.name}:${n.type}`)
+        .sort()
+        .join("|");
     expect(sig(workflow)).toBe(sig(input));
     // _meta: relayout must not ADD it; if the input had it, it must round-trip untouched (spec §8).
     if ("_meta" in input) {
