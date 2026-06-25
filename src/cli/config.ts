@@ -12,13 +12,32 @@ async function readJsonIfExists(path: string): Promise<FileConfig | null> {
   }
 }
 
+async function readJsonRequired(path: string): Promise<FileConfig> {
+  try {
+    return JSON.parse(await readFile(path, "utf8")) as FileConfig;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT")
+      throw new Error(`config file not found: ${path}`);
+    throw new Error(`invalid config file ${path}: ${(e as Error).message}`);
+  }
+}
+
 /** Precedence: --params > --config file > .n8nfmtrc.json > built-in defaults. */
 export async function resolveOptions(args: {
   config?: string;
   params?: string;
 }): Promise<RelayoutOptions> {
-  const fromFile = (await readJsonIfExists(args.config ?? ".n8nfmtrc.json")) ?? {};
-  const fromParams: FileConfig = args.params ? JSON.parse(args.params) : {};
+  const fromFile: FileConfig = args.config
+    ? await readJsonRequired(args.config)
+    : ((await readJsonIfExists(".n8nfmtrc.json")) ?? {});
+  let fromParams: FileConfig = {};
+  if (args.params) {
+    try {
+      fromParams = JSON.parse(args.params) as FileConfig;
+    } catch (e) {
+      throw new Error(`invalid --params JSON: ${(e as Error).message}`);
+    }
+  }
   const merged: FileConfig = { ...fromFile, ...fromParams };
   const { rankSep, nodeSep, ...config } = merged;
   return { config, rankSep, nodeSep };

@@ -28,4 +28,9 @@ describe("CLI filter mode", () => {
     expect(r.status).toBe(0);
     expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
   });
+
+  it("exits 2 on empty stdin", () => {
+    const r = run([], "");
+    expect(r.status).toBe(2);
+  });
 });
