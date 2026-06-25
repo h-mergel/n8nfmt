@@ -1,12 +1,20 @@
 {
   "name": "n8nfmt",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Opinionated auto-layout formatter for n8n workflow JSON. Not affiliated with n8n.",
   "type": "module",
   "license": "MIT",
   "author": "Heinrich Mergel",
-  "keywords": ["n8n", "workflow", "layout", "formatter", "elk"],
-  "engines": { "node": ">=22" },
+  "keywords": [
+    "n8n",
+    "workflow",
+    "layout",
+    "formatter",
+    "elk"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "sideEffects": false,
   "exports": {
     ".": {
@@ -14,8 +22,12 @@
       "import": "./dist/core/index.js"
     }
   },
-  "bin": { "n8nfmt": "./dist/cli/index.js" },
-  "files": ["dist"],
+  "bin": {
+    "n8nfmt": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
