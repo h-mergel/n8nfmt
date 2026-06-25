@@ -21,7 +21,20 @@ npx n8nfmt --check "workflows/**/*.json"
 
 # Filter mode (pipe one workflow through)
 cat workflow.json | npx n8nfmt
+
+# Use a custom config file and verbose output
+npx n8nfmt --write --config .n8nfmtrc.json --verbose "workflows/**/*.json"
 ```
+
+Options:
+
+| Flag | Description |
+|---|---|
+| `--write` | Rewrite files in place |
+| `--check` | Fail (exit 1) if any file would change |
+| `--config <file>` | Path to a JSON config file (same keys as `.n8nfmtrc.json`) |
+| `--params <json>` | Inline parameter overrides, e.g. `'{"rowStep":160}'` |
+| `--verbose` | Print per-file change counts to stderr |
 
 Exit codes: `0` ok · `1` `--check` found changes · `2` error.
 
@@ -46,6 +59,12 @@ Optional `.n8nfmtrc.json` in the project root:
 ```
 
 Override inline with `--params '{"rowStep":160}'`. Precedence: `--params` > `--config` > `.n8nfmtrc.json` > defaults.
+
+### Config keys
+
+`rowStep`, `minGap`, and `sectionGap` are `LayoutConfig` keys that control the section grid geometry (row height, minimum gap between nodes, gap between sticky sections).
+
+`rankSep` and `nodeSep` are ELK graph-spacing options (passed directly to the ELK layout engine as `elk.layered.spacing.nodeNodeBetweenLayers` and `elk.spacing.nodeNode`). They are distinct from the `LayoutConfig` keys and control how ELK spaces nodes during the initial rank-assignment pass.
 
 ## License
 

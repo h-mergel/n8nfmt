@@ -116,7 +116,7 @@ async function scoreParams(
     const wf = JSON.parse(fs.readFileSync(fixture, "utf8")) as N8nWorkflow;
 
     try {
-      const { workflow: candidateWf } = await relayout(wf, {
+      const { workflow: candidateWf, report } = await relayout(wf, {
         config: {
           rowStep: params.ROW_STEP,
           minGap: params.MIN_GAP,
@@ -125,6 +125,10 @@ async function scoreParams(
         rankSep: params.ranksep,
         nodeSep: params.nodesep,
       });
+
+      // Feed global-handler context from the engine report so the scorer can
+      // exempt handler nodes from "node left its sticky" hard violations (R11).
+      candidateWf._meta = { globalHandlers: report.globalHandlers };
 
       const result = score(candidateWf, originalWf);
 
@@ -225,7 +229,7 @@ try {
   const firstFixture = fixtureFiles[0];
   if (firstFixture !== undefined) {
     const wf = JSON.parse(fs.readFileSync(firstFixture, "utf8")) as N8nWorkflow;
-    const { workflow: laidOut } = await relayout(wf, {
+    const { workflow: laidOut, report: laidOutReport } = await relayout(wf, {
       config: {
         rowStep: bestParams.ROW_STEP,
         minGap: bestParams.MIN_GAP,
@@ -234,6 +238,7 @@ try {
       rankSep: bestParams.ranksep,
       nodeSep: bestParams.nodesep,
     });
+    laidOut._meta = { globalHandlers: laidOutReport.globalHandlers };
     const scored = score(laidOut);
     plateauAnalysis = {
       fixture: path.basename(firstFixture),

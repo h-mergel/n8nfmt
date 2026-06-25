@@ -20,6 +20,10 @@ export async function relayout(
   workflow: N8nWorkflow,
   options: RelayoutOptions = {},
 ): Promise<RelayoutResult> {
+  if (!workflow || !Array.isArray(workflow.nodes)) {
+    throw new Error("not an n8n workflow: expected an object with a nodes[] array");
+  }
+
   const config = buildLayoutConfig(options.config);
   const rankSep = options.rankSep ?? 80;
   const nodeSep = options.nodeSep ?? 100;

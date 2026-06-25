@@ -37,4 +37,8 @@ describe("relayout", () => {
     expect(report.totalNodes).toBe(0);
     expect(report.nodesChanged).toBe(0);
   });
+
+  it("throws a clear error for non-workflow input (missing nodes array)", async () => {
+    await expect(relayout({} as unknown as N8nWorkflow)).rejects.toThrow(/not an n8n workflow/);
+  });
 });
